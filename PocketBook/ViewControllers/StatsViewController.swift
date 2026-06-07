@@ -134,6 +134,7 @@ final class StatsViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
         buildLayout()
+        title = "통계"
         prevButton.addTarget(self, action: #selector(prevMonth), for: .touchUpInside)
         nextButton.addTarget(self, action: #selector(nextMonth), for: .touchUpInside)
         modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)

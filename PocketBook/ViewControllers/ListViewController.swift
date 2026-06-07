@@ -77,13 +77,6 @@ final class ListViewController: UIViewController {
 
     // MARK: Search & Filter
     private let filterBar = CategoryFilterBar()
-    private lazy var searchController: UISearchController = {
-        let sc = UISearchController(searchResultsController: nil)
-        sc.searchResultsUpdater = self
-        sc.obscuresBackgroundDuringPresentation = false
-        sc.searchBar.placeholder = "메모·카테고리 검색"
-        return sc
-    }()
 
     private let tableView: UITableView = {
         let tv = UITableView(frame: .zero, style: .plain)
@@ -127,11 +120,13 @@ final class ListViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
         buildLayout()
+        title = "기록"
         wireActions()
 
-        navigationItem.searchController = searchController
-        navigationItem.hidesSearchBarWhenScrolling = false
-        definesPresentationContext = true
+        filterBar.onSearchChanged = { [weak self] text in
+            self?.searchText = text
+            self?.reload(animatedTotal: false)
+        }
         filterBar.onSelect = { [weak self] cat in
             self?.categoryFilter = cat
             self?.reload(animatedTotal: false)
@@ -292,6 +287,8 @@ final class ListViewController: UIViewController {
                 let textOK = q.isEmpty
                     || e.memo.lowercased().contains(q)
                     || e.category.rawValue.lowercased().contains(q)
+                    || e.tags.contains { $0.lowercased().contains(q) }
+                    || (e.isFixed && "고정비".contains(q))
                 return catOK && textOK
             }
             return items.isEmpty ? nil : DaySection(date: sec.date, expenses: items)
@@ -454,13 +451,5 @@ extension ListViewController: UITableViewDataSource, UITableViewDelegate {
             completion(true)
         })
         present(alert, animated: true)
-    }
-}
-
-// MARK: - Search
-extension ListViewController: UISearchResultsUpdating {
-    func updateSearchResults(for searchController: UISearchController) {
-        searchText = searchController.searchBar.text ?? ""
-        reload(animatedTotal: false)
     }
 }
