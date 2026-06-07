@@ -16,7 +16,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate,
         ExpenseStore.shared.seedDemoDataIfEmpty()
 
         window = UIWindow(frame: UIScreen.main.bounds)
-        window?.rootViewController = MainTabBarController()
+        window?.backgroundColor = .white
+
+        let splash = SplashViewController()
+        splash.onComplete = { [weak self] in
+            guard let w = self?.window else { return }
+            UIView.transition(with: w, duration: 0.3, options: .transitionCrossDissolve) {
+                w.rootViewController = MainTabBarController()
+            }
+        }
+        window?.rootViewController = splash
         window?.makeKeyAndVisible()
         return true
     }

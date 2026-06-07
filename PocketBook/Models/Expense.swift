@@ -29,7 +29,7 @@ enum Category: String, CaseIterable, Codable {
 
     var symbolName: String {
         switch self {
-        case .food:      return "cart.fill"
+        case .food:      return "fork.knife"
         case .transport: return "tram.fill"
         case .culture:   return "film.fill"
         case .etc:       return "ellipsis.circle.fill"
