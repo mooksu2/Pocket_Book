@@ -147,7 +147,22 @@ final class ExpenseStore {
         }
         return result
     }
-
+    
+    /// 카테고리 내 태그별 합계. 태그 없는 지출은 "태그 없음"으로 묶음.
+    /// 한 지출에 태그가 여러 개면 각 태그에 전액을 귀속(필터 합계 개념).
+    func tagTotals(year: Int, month: Int, category: Category) -> [(tag: String, amount: Int)] {
+        let items = expenses(year: year, month: month).filter { $0.category == category }
+        var dict: [String: Int] = [:]
+        for e in items {
+            if e.tags.isEmpty {
+                dict["태그 없음", default: 0] += e.amount
+            } else {
+                for t in e.tags { dict[t, default: 0] += e.amount }
+            }
+        }
+        return dict.sorted { $0.value > $1.value }.map { (tag: $0.key, amount: $0.value) }
+    }
+    
     /// 특정 날짜(하루)의 지출 목록 (시간 역순).
     func expenses(on date: Date) -> [Expense] {
         let cal = Calendar.current

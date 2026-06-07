@@ -8,7 +8,10 @@ final class AddViewController: UIViewController {
     private var selectedCategory: Category = .food
     private var chips: [CategoryChip] = []
     private var amountValue = 0
-
+    private var selectedTags: [String] = []
+    private var isFixed: Bool = false
+    private let tagPicker = TagPickerView()
+    
     // MARK: UI
     private let amountLabel: UILabel = {
         let l = UILabel()
@@ -77,6 +80,11 @@ final class AddViewController: UIViewController {
             barButtonSystemItem: .close, target: self, action: #selector(close))
 
         buildLayout()
+        tagPicker.configure(for: selectedCategory)
+        tagPicker.onChanged = { [weak self] tags, fixed in
+            self?.selectedTags = tags
+            self?.isFixed = fixed
+        }
         view.addSubview(hiddenField)
         hiddenField.addTarget(self, action: #selector(amountTyping), for: .editingChanged)
         memoField.delegate = self
@@ -131,6 +139,7 @@ final class AddViewController: UIViewController {
 
         let stack = UIStackView(arrangedSubviews: [
             makeFieldLabel("카테고리"), chipRow,
+            makeFieldLabel("태그"), tagPicker,
             spacer(8), amountLabel, quickRow,
             spacer(8), memoSection, dateSection,
         ])
@@ -225,11 +234,16 @@ final class AddViewController: UIViewController {
         datePicker.date = e.date
         chips.forEach { $0.isSelected = ($0.category == e.category) }
         hiddenField.text = "\(e.amount)"
-    }
+        selectedTags = e.tags
+        isFixed = e.isFixed
+        tagPicker.configure(for: e.category, preselected: e.tags, isFixed: e.isFixed)    }
 
     @objc private func chipTapped(_ chip: CategoryChip) {
         Haptic.selection()
         selectedCategory = chip.category
+        selectedTags = []
+        isFixed = false
+        tagPicker.configure(for: selectedCategory)
         UIView.animate(withDuration: 0.2) {
             self.chips.forEach { $0.isSelected = ($0 === chip) }
         }
@@ -270,7 +284,10 @@ final class AddViewController: UIViewController {
             category: selectedCategory,
             amount: amountValue,
             memo: memoField.text?.trimmingCharacters(in: .whitespaces) ?? "",
-            date: datePicker.date)
+            date: datePicker.date,
+            tags: selectedTags,
+            isFixed: isFixed)
+        TagLibrary.record(selectedTags, for: selectedCategory)
         if editingExpanse == nil { ExpenseStore.shared.add(expense) }
         else { ExpenseStore.shared.update(expense) }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }

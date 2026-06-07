@@ -32,6 +32,14 @@ final class ExpenseCell: UITableViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
+    private let tagStack: UIStackView = {
+        let s = UIStackView()
+        s.axis = .horizontal
+        s.spacing = 4
+        s.alignment = .center
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
+    }()
     private let amountLabel: UILabel = {
         let l = UILabel()
         l.font = Theme.Font.money(17, .bold)
@@ -60,9 +68,10 @@ final class ExpenseCell: UITableViewCell {
     private func setup() {
         iconContainer.addSubview(iconView)
 
-        let titleStack = UIStackView(arrangedSubviews: [categoryLabel, memoLabel])
+        let titleStack = UIStackView(arrangedSubviews: [categoryLabel, memoLabel, tagStack])
         titleStack.axis = .vertical
-        titleStack.spacing = 2
+        titleStack.spacing = 3
+        titleStack.alignment = .leading
         titleStack.translatesAutoresizingMaskIntoConstraints = false
 
         let amountStack = UIStackView(arrangedSubviews: [amountLabel, timeLabel])
@@ -91,7 +100,7 @@ final class ExpenseCell: UITableViewCell {
             amountStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Theme.Space.lg),
             amountStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
 
-            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 68),
         ])
     }
 
@@ -101,7 +110,47 @@ final class ExpenseCell: UITableViewCell {
         categoryLabel.text = e.category.rawValue
         memoLabel.text = e.memo.isEmpty ? "메모 없음" : e.memo
         memoLabel.textColor = e.memo.isEmpty ? Theme.Color.tertiaryText : Theme.Color.subText
+
+        // 태그 알약 다시 그리기
+        tagStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        if e.isFixed {
+            tagStack.addArrangedSubview(makeChip("고정비", color: Theme.Color.point, filled: true))
+        }
+        for tag in e.tags {
+            tagStack.addArrangedSubview(makeChip(tag, color: e.category.color, filled: false))
+        }
+        tagStack.isHidden = e.tags.isEmpty && !e.isFixed
+        if !tagStack.isHidden {
+            let spacer = UIView()
+            spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            tagStack.addArrangedSubview(spacer)   // 왼쪽 정렬 + 늘어남 방지
+        }
+
         amountLabel.text = "-" + e.amount.won
         timeLabel.text = e.date.timeShort
+    }
+
+    private func makeChip(_ text: String, color: UIColor, filled: Bool) -> UIView {
+        let l = TagPillLabel()
+        l.text = text
+        l.font = Theme.Font.caption(11)
+        l.textColor = filled ? .white : color
+        l.backgroundColor = filled ? color : color.withAlphaComponent(0.15)
+        l.layer.cornerRadius = 9
+        l.layer.masksToBounds = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.setContentHuggingPriority(.required, for: .horizontal)
+        return l
+    }
+}
+
+/// 내부 여백을 가진 알약형 라벨
+final class TagPillLabel: UILabel {
+    var inset = UIEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+    override func drawText(in rect: CGRect) { super.drawText(in: rect.inset(by: inset)) }
+    override var intrinsicContentSize: CGSize {
+        let s = super.intrinsicContentSize
+        return CGSize(width: s.width + inset.left + inset.right,
+                      height: s.height + inset.top + inset.bottom)
     }
 }

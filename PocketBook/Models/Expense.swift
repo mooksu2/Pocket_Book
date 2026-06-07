@@ -41,23 +41,35 @@ enum Category: String, CaseIterable, Codable {
 struct Expense: Codable, Identifiable, Equatable {
     var id:       UUID
     var category: Category
-    var amount:   Int          // 원 단위
+    var amount:   Int
     var memo:     String
     var date:     Date
+    var tags:     [String]
+    var isFixed:  Bool
 
-    init(id: UUID = UUID(),
-         category: Category,
-         amount: Int,
-         memo: String = "",
-         date: Date = Date()) {
-        self.id       = id
-        self.category = category
-        self.amount   = amount
-        self.memo     = memo
-        self.date     = date
+    init(id: UUID = UUID(), category: Category, amount: Int,
+         memo: String = "", date: Date = Date(),
+         tags: [String] = [], isFixed: Bool = false) {
+        self.id = id; self.category = category; self.amount = amount
+        self.memo = memo; self.date = date
+        self.tags = tags; self.isFixed = isFixed
+    }
+
+    
+    enum CodingKeys: String, CodingKey {
+        case id, category, amount, memo, date, tags, isFixed
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decode(UUID.self,     forKey: .id)
+        category = try c.decode(Category.self, forKey: .category)
+        amount   = try c.decode(Int.self,      forKey: .amount)
+        memo     = try c.decode(String.self,   forKey: .memo)
+        date     = try c.decode(Date.self,     forKey: .date)
+        tags     = try c.decodeIfPresent([String].self, forKey: .tags)    ?? []
+        isFixed  = try c.decodeIfPresent(Bool.self,     forKey: .isFixed) ?? false
     }
 }
-
 // MARK: - Daily Section (리스트 그룹핑용)
 struct DaySection {
     let date: Date

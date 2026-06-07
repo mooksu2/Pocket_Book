@@ -31,6 +31,9 @@ final class StatsViewController: UIViewController {
 
     private let donut = DonutChartView()
     private let bars = BarChartView()
+    private var expandedCategory: Category?
+    private var lastTotals: [Category: Int] = [:]
+    private var lastTotal = 0
     private let breakdownStack: UIStackView = {
         let s = UIStackView()
         s.axis = .vertical
@@ -41,6 +44,82 @@ final class StatsViewController: UIViewController {
     private lazy var emptyView = EmptyStateView(
         symbol: "chart.pie", title: "표시할 데이터가 없어요",
         subtitle: "이번 달 지출을 기록하면\n여기에서 분석을 볼 수 있어요")
+
+    private func rebuildBreakdown() {
+        breakdownStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let sorted = Category.allCases
+            .map { ($0, lastTotals[$0] ?? 0) }
+            .filter { $0.1 > 0 }
+            .sorted { $0.1 > $1.1 }
+        for (cat, amount) in sorted {
+            let frac = lastTotal > 0 ? CGFloat(amount) / CGFloat(lastTotal) : 0
+            let row = CategoryBreakdownRow(category: cat, amount: amount, fraction: frac)
+            row.setExpanded(expandedCategory == cat)
+            row.onTap = { [weak self] in
+                guard let self = self else { return }
+                self.expandedCategory = (self.expandedCategory == cat) ? nil : cat
+                self.rebuildBreakdown()
+            }
+            breakdownStack.addArrangedSubview(row)
+
+            if expandedCategory == cat {
+                let tags = ExpenseStore.shared.tagTotals(year: year, month: month, category: cat)
+                for t in tags {
+                    let f = amount > 0 ? CGFloat(t.amount) / CGFloat(amount) : 0
+                    breakdownStack.addArrangedSubview(makeTagRow(tag: t.tag, amount: t.amount, fraction: f, color: cat.color))
+                }
+            }
+        }
+    }
+
+    private func makeTagRow(tag: String, amount: Int, fraction: CGFloat, color: UIColor) -> UIView {
+        let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        let bullet = UIView()
+        bullet.backgroundColor = color.withAlphaComponent(0.55)
+        bullet.layer.cornerRadius = 2.5
+        bullet.translatesAutoresizingMaskIntoConstraints = false
+
+        let name = UILabel()
+        name.text = tag
+        name.font = Theme.Font.body(13)
+        name.textColor = Theme.Color.subText
+        name.translatesAutoresizingMaskIntoConstraints = false
+
+        let pct = UILabel()
+        pct.text = "\(Int(fraction * 100))%"
+        pct.font = Theme.Font.caption(11)
+        pct.textColor = Theme.Color.tertiaryText
+        pct.translatesAutoresizingMaskIntoConstraints = false
+
+        let amt = UILabel()
+        amt.text = amount.won
+        amt.font = Theme.Font.money(13, .medium)
+        amt.textColor = Theme.Color.subText
+        amt.textAlignment = .right
+        amt.translatesAutoresizingMaskIntoConstraints = false
+
+        [bullet, name, pct, amt].forEach { row.addSubview($0) }
+        NSLayoutConstraint.activate([
+            bullet.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 18),
+            bullet.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            bullet.widthAnchor.constraint(equalToConstant: 5),
+            bullet.heightAnchor.constraint(equalToConstant: 5),
+
+            name.leadingAnchor.constraint(equalTo: bullet.trailingAnchor, constant: 8),
+            name.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+
+            pct.leadingAnchor.constraint(equalTo: name.trailingAnchor, constant: 6),
+            pct.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+
+            amt.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            amt.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+
+            row.heightAnchor.constraint(equalToConstant: 30),
+        ])
+        return row
+    }
 
     private static func navButton(_ symbol: String) -> UIButton {
         let b = UIButton(type: .system)
@@ -147,15 +226,9 @@ final class StatsViewController: UIViewController {
         bars.setData(totals: totals, total: total)
 
         // breakdown 갱신
-        breakdownStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let sorted = Category.allCases
-            .map { ($0, totals[$0] ?? 0) }
-            .filter { $0.1 > 0 }
-            .sorted { $0.1 > $1.1 }
-        for (cat, amount) in sorted {
-            let frac = CGFloat(amount) / CGFloat(total)
-            breakdownStack.addArrangedSubview(CategoryBreakdownRow(category: cat, amount: amount, fraction: frac))
-        }
+        lastTotals = totals
+        lastTotal = total
+        rebuildBreakdown()
     }
 
     @objc private func modeChanged() {
