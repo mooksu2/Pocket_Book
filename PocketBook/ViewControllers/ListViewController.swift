@@ -15,15 +15,24 @@ final class ListViewController: UIViewController {
         b.titleLabel?.font = Theme.Font.title(16)
         b.tintColor = Theme.Color.mainText
         b.setTitleColor(Theme.Color.mainText, for: .normal)
-        b.setImage(UIImage(systemName: "chevron.down",
-                           withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .bold)), for: .normal)
-        b.semanticContentAttribute = .forceRightToLeft     // 이미지를 제목 뒤(오른쪽)로
-        b.imageEdgeInsets = UIEdgeInsets(top: 0, left: 6, bottom: 0, right: -6)
         return b
     }()
     private let prevButton = ListViewController.navButton("chevron.left")
     private let nextButton = ListViewController.navButton("chevron.right")
-
+    
+    private let todayButton: UIButton = {
+        let b = UIButton(type: .system)
+        b.setTitle("오늘", for: .normal)
+        b.titleLabel?.font = Theme.Font.caption(12)
+        b.setTitleColor(Theme.Color.point, for: .normal)
+        b.layer.borderColor = Theme.Color.point.cgColor
+        b.layer.borderWidth = 1
+        b.layer.cornerRadius = 9
+        b.contentEdgeInsets = UIEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        return b
+    }()
+    
     private let totalCaption: UILabel = {
         let l = UILabel()
         l.text = "이번 달 지출"
@@ -32,6 +41,7 @@ final class ListViewController: UIViewController {
         l.textAlignment = .center
         return l
     }()
+    
     private let totalLabel: AnimatedCountLabel = {
         let l = AnimatedCountLabel()
         l.font = Theme.Font.display(44)
@@ -141,7 +151,7 @@ final class ListViewController: UIViewController {
 
     // MARK: Layout
     private func buildLayout() {
-        let navRow = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton])
+        let navRow = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton, todayButton])
         navRow.alignment = .center
         navRow.spacing = Theme.Space.sm
         navRow.translatesAutoresizingMaskIntoConstraints = false
@@ -219,7 +229,8 @@ final class ListViewController: UIViewController {
     private func wireActions() {
         prevButton.addTarget(self, action: #selector(prevMonth), for: .touchUpInside)
         nextButton.addTarget(self, action: #selector(nextMonth), for: .touchUpInside)
-        monthButton.addTarget(self, action: #selector(jumpToToday), for: .touchUpInside)
+        monthButton.addTarget(self, action: #selector(showMonthPicker), for: .touchUpInside)
+        todayButton.addTarget(self, action: #selector(jumpToToday), for: .touchUpInside)
         addButton.addTarget(self, action: #selector(addDown), for: .touchDown)
         addButton.addTarget(self, action: #selector(addUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButton.addTarget(self, action: #selector(openAdd), for: .touchUpInside)
@@ -234,6 +245,7 @@ final class ListViewController: UIViewController {
         let insight = ExpenseStore.shared.insight(year: year, month: month)
 
         monthButton.setTitle("\(year)년 \(month)월", for: .normal)
+        updateTodayButton()
         totalLabel.setValue(total, animated: animatedTotal)
 
         // 예산 진행바 (P3)
@@ -338,7 +350,25 @@ final class ListViewController: UIViewController {
         year = Date().year; month = Date().month
         reload(animatedTotal: true)
     }
+    
+    @objc private func showMonthPicker() {
+        Haptic.selection()
+        let vc = MonthPickerViewController(year: year, month: month)
+        vc.onSelect = { [weak self] y, m in
+            guard let self = self else { return }
+            self.year = y; self.month = m
+            self.reload(animatedTotal: false)
+        }
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .pageSheet
+        present(nav, animated: true)
+    }
 
+    private func updateTodayButton() {
+        let t = Date()
+        todayButton.isHidden = (year == t.year && month == t.month)
+    }
+    
     @objc private func addDown() { addButton.pressDown() }
     @objc private func addUp()   { addButton.pressUp() }
 
