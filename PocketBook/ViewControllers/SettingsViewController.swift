@@ -116,11 +116,12 @@ final class SettingsViewController: UIViewController {
         notifySwitch.onTintColor = Theme.Color.point
         syncSwitch.addTarget(self, action: #selector(toggleSync), for: .valueChanged)
         notifySwitch.addTarget(self, action: #selector(toggleNotify), for: .valueChanged)
-
+        syncSwitch.isEnabled = false
+        
         let syncRow = toggleRow(
             icon: "icloud", iconColor: Theme.Color.point,
             title: "iCloud 동기화",
-            subtitle: "여러 기기에서 같은 가계부를 사용",
+            subtitle: "유료 개발자 계정 필요 · 현재 미지원",
             control: syncSwitch)
         let divider = UIView()
         divider.backgroundColor = Theme.Color.hairline

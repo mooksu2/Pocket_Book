@@ -1,21 +1,30 @@
 // AppDelegate.swift
 import UIKit
+import UserNotifications
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate,
+                   UNUserNotificationCenterDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // iCloud 동기화 시작 — 설정이 켜져 있으면 원격 변경 감지 (P3)
-        CloudSyncService.shared.start()
+        // 포그라운드에서도 알림 배너 표시
+        UNUserNotificationCenter.current().delegate = self
 
-        // 최초 실행 시 데모 데이터로 화면을 채워 첫인상을 전달
+        CloudSyncService.shared.start()
         ExpenseStore.shared.seedDemoDataIfEmpty()
 
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.rootViewController = MainTabBarController()
         window?.makeKeyAndVisible()
         return true
+    }
+
+    // 앱이 열려 있을 때도 배너 + 소리 표시
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 }
