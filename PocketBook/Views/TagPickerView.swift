@@ -1,6 +1,6 @@
 import UIKit
 
-/// 카테고리별 태그 선택 뷰 (가로 스크롤 알약 + 고정비 토글)
+/// 카테고리별 태그 선택 뷰 (가로 스크롤 알약 + 고정지출 토글)
 final class TagPickerView: UIView {
 
     var onChanged: (([String], Bool) -> Void)?
@@ -22,7 +22,7 @@ final class TagPickerView: UIView {
         scroll.addSubview(pillStack)
 
         let fixedLabel = UILabel()
-        fixedLabel.text      = "고정비"
+        fixedLabel.text      = "고정지출"
         fixedLabel.font      = Theme.Font.body(14)
         fixedLabel.textColor = Theme.Color.mainText
         fixedSwitch.onTintColor = Theme.Color.point

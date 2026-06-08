@@ -14,7 +14,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate,
 
         CloudSyncService.shared.start()
         ExpenseStore.shared.seedDemoDataIfEmpty()
-
+        RecurringStore.shared.materializeDueExpenses() 
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.backgroundColor = .white
 

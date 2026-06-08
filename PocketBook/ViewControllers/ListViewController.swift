@@ -117,6 +117,46 @@ final class ListViewController: UIViewController {
         return b
     }()
 
+    // MARK: 고정지출 진입 (Fixed-expense entry)
+    private let fixedRow: UIControl = {
+        let v = UIControl()
+        v.backgroundColor = Theme.Color.pointSoft
+        v.layer.cornerRadius = Theme.Radius.sm
+        v.layer.cornerCurve = .continuous
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+    private let fixedTitleLabel: UILabel = {
+        let l = UILabel()
+        l.text = "고정지출"
+        l.font = Theme.Font.caption(13)
+        l.textColor = Theme.Color.point
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private let fixedAmountLabel: UILabel = {
+        let l = UILabel()
+        l.font = Theme.Font.money(14, .semibold)
+        l.textColor = Theme.Color.point
+        l.textAlignment = .right
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private let fixedActionLabel: UILabel = {
+        let l = UILabel()
+        l.font = Theme.Font.caption(13)
+        l.textColor = Theme.Color.subText
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    private let fixedChevron: UIImageView = {
+        let iv = UIImageView(image: UIImage(systemName: "chevron.right",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)))
+        iv.tintColor = Theme.Color.point
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
     private static func navButton(_ symbol: String) -> UIButton {
         let b = UIButton(type: .system)
         b.setImage(UIImage(systemName: symbol,
@@ -146,6 +186,8 @@ final class ListViewController: UIViewController {
                                                name: .expensesDidChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(reloadOnChange),
                                                name: .settingsDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(reloadOnChange),
+                                               name: .recurringDidChange, object: nil)
         reload(animatedTotal: true)
     }
 
@@ -157,8 +199,12 @@ final class ListViewController: UIViewController {
         navRow.translatesAutoresizingMaskIntoConstraints = false
 
         insightView.addSubview(insightLabel)
+        fixedRow.addSubview(fixedTitleLabel)
+        fixedRow.addSubview(fixedAmountLabel)
+        fixedRow.addSubview(fixedActionLabel)
+        fixedRow.addSubview(fixedChevron)
         budgetView.translatesAutoresizingMaskIntoConstraints = false
-        let header = UIStackView(arrangedSubviews: [navRow, totalCaption, totalLabel, comparisonLabel, budgetView, insightView])
+        let header = UIStackView(arrangedSubviews: [navRow, totalCaption, totalLabel, comparisonLabel, budgetView, insightView, fixedRow])
         header.axis = .vertical
         header.alignment = .center
         header.spacing = Theme.Space.xs
@@ -166,6 +212,7 @@ final class ListViewController: UIViewController {
         header.setCustomSpacing(Theme.Space.sm, after: totalLabel)
         header.setCustomSpacing(Theme.Space.lg, after: comparisonLabel)
         header.setCustomSpacing(Theme.Space.lg, after: budgetView)
+        header.setCustomSpacing(Theme.Space.sm, after: insightView)
         header.translatesAutoresizingMaskIntoConstraints = false
         header.isLayoutMarginsRelativeArrangement = true
         header.layoutMargins = UIEdgeInsets(top: Theme.Space.md, left: Theme.Space.lg,
@@ -194,6 +241,18 @@ final class ListViewController: UIViewController {
             insightLabel.leadingAnchor.constraint(equalTo: insightView.leadingAnchor, constant: Theme.Space.md),
             insightLabel.trailingAnchor.constraint(equalTo: insightView.trailingAnchor, constant: -Theme.Space.md),
             insightLabel.centerYAnchor.constraint(equalTo: insightView.centerYAnchor),
+
+            fixedRow.heightAnchor.constraint(equalToConstant: 44),
+            fixedRow.leadingAnchor.constraint(equalTo: header.layoutMarginsGuide.leadingAnchor),
+            fixedRow.trailingAnchor.constraint(equalTo: header.layoutMarginsGuide.trailingAnchor),
+            fixedTitleLabel.leadingAnchor.constraint(equalTo: fixedRow.leadingAnchor, constant: Theme.Space.md),
+            fixedTitleLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
+            fixedChevron.trailingAnchor.constraint(equalTo: fixedRow.trailingAnchor, constant: -Theme.Space.md),
+            fixedChevron.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
+            fixedActionLabel.trailingAnchor.constraint(equalTo: fixedChevron.leadingAnchor, constant: -Theme.Space.xs),
+            fixedActionLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
+            fixedAmountLabel.trailingAnchor.constraint(equalTo: fixedActionLabel.leadingAnchor, constant: -Theme.Space.sm),
+            fixedAmountLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
 
             // 큰 금액이 화면을 넘지 않도록 폭 제한 → adjustsFontSizeToFitWidth 동작
             totalLabel.widthAnchor.constraint(lessThanOrEqualTo: header.layoutMarginsGuide.widthAnchor),
@@ -234,6 +293,15 @@ final class ListViewController: UIViewController {
         addButton.addTarget(self, action: #selector(addDown), for: .touchDown)
         addButton.addTarget(self, action: #selector(addUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButton.addTarget(self, action: #selector(openAdd), for: .touchUpInside)
+        fixedRow.addTarget(self, action: #selector(openFixed), for: .touchUpInside)
+    }
+
+    @objc private func openFixed() {
+        Haptic.medium()
+        let vc = RecurringListViewController()
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .pageSheet
+        present(nav, animated: true)
     }
 
     // MARK: Data
@@ -247,6 +315,11 @@ final class ListViewController: UIViewController {
         monthButton.setTitle("\(year)년 \(month)월", for: .normal)
         updateTodayButton()
         totalLabel.setValue(total, animated: animatedTotal)
+
+        // 고정지출 진입 줄 — 이번 달 고정지출 총액 + 액션
+        let fixedTotal = RecurringStore.shared.monthlyTotal()
+        fixedAmountLabel.text = fixedTotal.won
+        fixedActionLabel.text = RecurringStore.shared.items.isEmpty ? "등록하기" : "관리"
 
         // 예산 진행바 (P3)
         if let status = ExpenseStore.shared.budgetStatus(year: year, month: month) {
@@ -300,7 +373,7 @@ final class ListViewController: UIViewController {
                     || e.memo.lowercased().contains(q)
                     || e.category.rawValue.lowercased().contains(q)
                     || e.tags.contains { $0.lowercased().contains(q) }
-                    || (e.isFixed && "고정비".contains(q))
+                    || (e.isFixed && "고정지출".contains(q))
                 return catOK && textOK
             }
             return items.isEmpty ? nil : DaySection(date: sec.date, expenses: items)

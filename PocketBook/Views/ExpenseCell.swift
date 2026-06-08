@@ -114,7 +114,7 @@ final class ExpenseCell: UITableViewCell {
         // 태그 알약 다시 그리기
         tagStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         if e.isFixed {
-            tagStack.addArrangedSubview(makeChip("고정비", color: Theme.Color.point, filled: true))
+            tagStack.addArrangedSubview(makeChip("고정지출", color: Theme.Color.point, filled: true))
         }
         for tag in e.tags {
             tagStack.addArrangedSubview(makeChip(tag, color: e.category.color, filled: false))

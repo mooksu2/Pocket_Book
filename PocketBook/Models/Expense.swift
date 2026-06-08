@@ -46,18 +46,21 @@ struct Expense: Codable, Identifiable, Equatable {
     var date:     Date
     var tags:     [String]
     var isFixed:  Bool
+    var recurringID: UUID?
 
     init(id: UUID = UUID(), category: Category, amount: Int,
          memo: String = "", date: Date = Date(),
-         tags: [String] = [], isFixed: Bool = false) {
+         tags: [String] = [], isFixed: Bool = false,
+         recurringID: UUID? = nil) {
         self.id = id; self.category = category; self.amount = amount
         self.memo = memo; self.date = date
         self.tags = tags; self.isFixed = isFixed
+        self.recurringID = recurringID
     }
 
     
     enum CodingKeys: String, CodingKey {
-        case id, category, amount, memo, date, tags, isFixed
+        case id, category, amount, memo, date, tags, isFixed, recurringID
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -68,6 +71,7 @@ struct Expense: Codable, Identifiable, Equatable {
         date     = try c.decode(Date.self,     forKey: .date)
         tags     = try c.decodeIfPresent([String].self, forKey: .tags)    ?? []
         isFixed  = try c.decodeIfPresent(Bool.self,     forKey: .isFixed) ?? false
+        recurringID = try c.decodeIfPresent(UUID.self,  forKey: .recurringID)
     }
 }
 // MARK: - Daily Section (리스트 그룹핑용)
