@@ -30,8 +30,11 @@ final class MainTabBarController: UITabBarController {
         viewControllers = [list, calendar, stats, settings]
 
         let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = Theme.Color.card
+        appearance.shadowColor = Theme.Color.hairline
         tabBar.standardAppearance = appearance
+        tabBar.scrollEdgeAppearance = appearance
         tabBar.tintColor = Theme.Color.point
     }
 }

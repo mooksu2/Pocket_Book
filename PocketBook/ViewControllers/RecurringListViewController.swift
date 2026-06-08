@@ -286,7 +286,7 @@ private final class RecurringCell: UITableViewCell {
     func configure(_ item: RecurringExpense, recorded: Bool) {
         iconWrap.backgroundColor = item.category.color
         iconView.image = UIImage(systemName: item.category.symbolName)
-        nameLabel.text = item.name
+        nameLabel.text = item.name.isEmpty ? item.category.rawValue : item.name
         subLabel.text = "매월 \(item.dayOfMonth)일 · \(item.category.rawValue)"
         amountLabel.text = item.amount.won
 

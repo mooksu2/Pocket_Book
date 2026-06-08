@@ -1,6 +1,6 @@
 import UIKit
 
-/// 고정지출 등록·수정 폼. 이름 / 금액 / 카테고리 / 매월 며칠 4가지만 받는다.
+/// 고정지출 등록·수정 폼. 메모 / 금액 / 카테고리 / 매월 며칠.
 final class RecurringEditViewController: UIViewController {
 
     var onSaved: (() -> Void)?
@@ -10,11 +10,12 @@ final class RecurringEditViewController: UIViewController {
     private var chips: [CategoryChip] = []
     private var amountValue = 0
     private var dayOfMonth = 1
+    private let tagPicker = TagPickerView()
 
     // MARK: UI
     private let nameField: UITextField = {
         let tf = UITextField()
-        tf.placeholder = "이름 (예: 월세, 넷플릭스)"
+        tf.placeholder = "메모 (예: 월세, 넷플릭스)"
         tf.font = Theme.Font.body(15)
         tf.borderStyle = .none
         tf.returnKeyType = .done
@@ -91,12 +92,20 @@ final class RecurringEditViewController: UIViewController {
         nameField.delegate = self
         dayStepper.addTarget(self, action: #selector(dayChanged), for: .valueChanged)
 
+        tagPicker.setFixedToggleHidden(true)   // 고정지출 화면이라 토글 불필요, 태그만 사용
+
+        // 빈 곳 탭 → 키패드 내리기 (금액 라벨·컨트롤 위 탭은 제외)
+        let tapToDismiss = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapToDismiss.cancelsTouchesInView = false
+        tapToDismiss.delegate = self
+        view.addGestureRecognizer(tapToDismiss)
+
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChange(_:)),
                                                name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
                                                name: UIResponder.keyboardWillHideNotification, object: nil)
 
-        if let it = editingItem { prefill(it) }
+        if let it = editingItem { prefill(it) } else { tagPicker.configure(for: selectedCategory) }
         refresh()
     }
 
@@ -126,18 +135,24 @@ final class RecurringEditViewController: UIViewController {
         dayRow.alignment = .center
         dayRow.distribution = .equalSpacing
 
-        let nameSection = labeledCard("이름", nameField)
+        let nameSection = labeledCard("메모", nameField)
         let daySection  = labeledCard("결제일 (매월)", dayRow)
+
+        let amountSeparator = UIView()
+        amountSeparator.backgroundColor = Theme.Color.hairline
+        amountSeparator.translatesAutoresizingMaskIntoConstraints = false
 
         let stack = UIStackView(arrangedSubviews: [
             makeFieldLabel("카테고리"), chipRow,
-            spacer(8), amountLabel,
-            spacer(8), nameSection, daySection,
+            amountSeparator, amountLabel,
+            makeFieldLabel("태그"), tagPicker,
+            nameSection, daySection,
         ])
         stack.axis = .vertical
         stack.spacing = Theme.Space.sm
         stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
-        stack.setCustomSpacing(Theme.Space.md, after: amountLabel)
+        stack.setCustomSpacing(Theme.Space.lg, after: amountLabel)
+        stack.setCustomSpacing(Theme.Space.lg, after: tagPicker)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(stack)
@@ -152,6 +167,7 @@ final class RecurringEditViewController: UIViewController {
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
             chipRow.heightAnchor.constraint(equalToConstant: 64),
+            amountSeparator.heightAnchor.constraint(equalToConstant: 1),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
@@ -212,11 +228,13 @@ final class RecurringEditViewController: UIViewController {
         dayStepper.value = Double(it.dayOfMonth)
         dayValueLabel.text = "매월 \(it.dayOfMonth)일"
         chips.forEach { $0.isSelected = ($0.category == it.category) }
+        tagPicker.configure(for: it.category, preselected: it.tags)
     }
 
     @objc private func chipTapped(_ chip: CategoryChip) {
         Haptic.selection()
         selectedCategory = chip.category
+        tagPicker.configure(for: selectedCategory)   // 카테고리별 태그 갱신
         UIView.animate(withDuration: 0.2) {
             self.chips.forEach { $0.isSelected = ($0 === chip) }
         }
@@ -242,14 +260,14 @@ final class RecurringEditViewController: UIViewController {
         amountLabel.text = amountValue.won
         amountLabel.textColor = amountValue > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
         let name = nameField.text?.trimmingCharacters(in: .whitespaces) ?? ""
-        let valid = amountValue > 0 && !name.isEmpty
+        let valid = amountValue > 0
         saveButton.isEnabled = valid
         saveButton.alpha = valid ? 1 : 0.45
     }
 
     @objc private func save() {
         let name = nameField.text?.trimmingCharacters(in: .whitespaces) ?? ""
-        guard amountValue > 0, !name.isEmpty else { return }
+        guard amountValue > 0 else { return }
         Haptic.success()
         let item = RecurringExpense(
             id: editingItem?.id ?? UUID(),
@@ -257,13 +275,25 @@ final class RecurringEditViewController: UIViewController {
             amount: amountValue,
             category: selectedCategory,
             dayOfMonth: dayOfMonth,
-            isActive: editingItem?.isActive ?? true)
+            isActive: editingItem?.isActive ?? true,
+            tags: Array(tagPicker.selectedTags))
         if editingItem == nil { RecurringStore.shared.add(item) }
         else { RecurringStore.shared.update(item) }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
     }
 
     @objc private func close() { dismiss(animated: true) }
+
+    @objc private func dismissKeyboard() { view.endEditing(true) }
+}
+
+extension RecurringEditViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let v = touch.view else { return true }
+        // 금액 라벨·버튼·스위치·텍스트필드 위 탭은 무시 (키패드 토글 충돌 방지)
+        if v.isDescendant(of: amountLabel) || v is UIControl || v is UITextField { return false }
+        return true
+    }
 }
 
 extension RecurringEditViewController: UITextFieldDelegate {

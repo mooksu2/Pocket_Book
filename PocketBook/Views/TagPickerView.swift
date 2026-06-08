@@ -11,6 +11,8 @@ final class TagPickerView: UIView {
     private let pillStack   = UIStackView()
     private let fixedSwitch = UISwitch()
     private var category: Category = .food
+    private var fixedRow: UIStackView?
+    private var sepLine: UIView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -28,11 +30,17 @@ final class TagPickerView: UIView {
         fixedSwitch.onTintColor = Theme.Color.point
         fixedSwitch.addTarget(self, action: #selector(fixedToggled), for: .valueChanged)
 
-        let fixedRow = UIStackView(arrangedSubviews: [fixedLabel, UIView(), fixedSwitch])
-        fixedRow.axis = .horizontal
-        fixedRow.translatesAutoresizingMaskIntoConstraints = false
+        let row = UIStackView(arrangedSubviews: [fixedLabel, UIView(), fixedSwitch])
+        row.axis = .horizontal
+        row.translatesAutoresizingMaskIntoConstraints = false
+        fixedRow = row
 
-        let outer = UIStackView(arrangedSubviews: [scroll, fixedRow])
+        let separator = UIView()
+        separator.backgroundColor = Theme.Color.hairline
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        sepLine = separator
+
+        let outer = UIStackView(arrangedSubviews: [scroll, separator, row])
         outer.axis    = .vertical
         outer.spacing = 10
         outer.translatesAutoresizingMaskIntoConstraints = false
@@ -43,6 +51,7 @@ final class TagPickerView: UIView {
             outer.bottomAnchor.constraint(equalTo: bottomAnchor),
             outer.leadingAnchor.constraint(equalTo: leadingAnchor),
             outer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            separator.heightAnchor.constraint(equalToConstant: 1),
             scroll.heightAnchor.constraint(equalToConstant: 34),
             pillStack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
             pillStack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
@@ -52,6 +61,12 @@ final class TagPickerView: UIView {
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    /// 고정지출 토글(+구분선) 숨기기 — 고정지출 등록 화면처럼 토글이 불필요할 때 사용.
+    func setFixedToggleHidden(_ hidden: Bool) {
+        fixedRow?.isHidden = hidden
+        sepLine?.isHidden = hidden
+    }
 
     func configure(for category: Category, preselected: [String] = [], isFixed: Bool = false) {
         self.category     = category

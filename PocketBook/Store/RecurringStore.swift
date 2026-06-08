@@ -1,4 +1,3 @@
-
 import Foundation
 
 extension Notification.Name {
@@ -74,7 +73,7 @@ final class RecurringStore {
                             amount: r.amount,
                             memo: r.name,
                             date: r.chargeDate(year: t.year, month: t.month),
-                            tags: [],
+                            tags: r.tags,
                             isFixed: true,
                             recurringID: r.id)
             ExpenseStore.shared.add(e)

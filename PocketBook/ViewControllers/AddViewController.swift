@@ -94,6 +94,12 @@ final class AddViewController: UIViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
                                                name: UIResponder.keyboardWillHideNotification, object: nil)
 
+        // 빈 곳 탭 → 키패드 내리기 (금액 라벨·컨트롤 위 탭은 제외)
+        let tapToDismiss = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapToDismiss.cancelsTouchesInView = false
+        tapToDismiss.delegate = self
+        view.addGestureRecognizer(tapToDismiss)
+
         if let e = editingExpanse { prefill(e) }
         refresh()
     }
@@ -294,8 +300,18 @@ final class AddViewController: UIViewController {
     }
 
     @objc private func close() { dismiss(animated: true) }
+
+    @objc private func dismissKeyboard() { view.endEditing(true) }
 }
 
 extension AddViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ tf: UITextField) -> Bool { tf.resignFirstResponder(); return true }
+}
+
+extension AddViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let v = touch.view else { return true }
+        if v.isDescendant(of: amountLabel) || v is UIControl || v is UITextField { return false }
+        return true
+    }
 }

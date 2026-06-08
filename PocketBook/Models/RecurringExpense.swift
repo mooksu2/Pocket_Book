@@ -8,19 +8,37 @@ struct RecurringExpense: Codable, Identifiable, Equatable {
     var category: Category
     var dayOfMonth: Int        // 1...31 (없는 날은 말일로 보정)
     var isActive: Bool
+    var tags: [String]
 
     init(id: UUID = UUID(),
          name: String,
          amount: Int,
          category: Category,
          dayOfMonth: Int,
-         isActive: Bool = true) {
+         isActive: Bool = true,
+         tags: [String] = []) {
         self.id         = id
         self.name       = name
         self.amount     = amount
         self.category   = category
         self.dayOfMonth = max(1, min(31, dayOfMonth))
         self.isActive   = isActive
+        self.tags       = tags
+    }
+
+    // 기존 저장 데이터(tags 없음) 호환
+    enum CodingKeys: String, CodingKey {
+        case id, name, amount, category, dayOfMonth, isActive, tags
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(UUID.self,     forKey: .id)
+        name       = try c.decode(String.self,   forKey: .name)
+        amount     = try c.decode(Int.self,      forKey: .amount)
+        category   = try c.decode(Category.self, forKey: .category)
+        dayOfMonth = try c.decode(Int.self,      forKey: .dayOfMonth)
+        isActive   = try c.decode(Bool.self,     forKey: .isActive)
+        tags       = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
     }
 
     /// 해당 연·월의 실제 청구 '일(day)'. 말일 보정: 31일 설정 + 2월 → 28/29.
