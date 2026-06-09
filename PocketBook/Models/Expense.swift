@@ -1,5 +1,6 @@
 // Models/Expense.swift
 import UIKit
+import SwiftData
 
 // MARK: - Category
 enum Category: String, CaseIterable, Codable {
@@ -38,42 +39,38 @@ enum Category: String, CaseIterable, Codable {
 }
 
 // MARK: - Expense
-struct Expense: Codable, Identifiable, Equatable {
-    var id:       UUID
-    var category: Category
-    var amount:   Int
-    var memo:     String
-    var date:     Date
-    var tags:     [String]
-    var isFixed:  Bool
+@Model
+final class Expense {
+    @Attribute(.unique) var id:          UUID
+    var categoryRaw: String          // SwiftData는 enum 직접 저장 불가 → rawValue로 우회
+    var amount:      Int
+    var memo:        String
+    var date:        Date
+    var tags:        [String]
+    var isFixed:     Bool
     var recurringID: UUID?
+    
+    @Transient
+    var category: Category {
+        get { Category(rawValue: categoryRaw) ?? .etc }
+        set { categoryRaw = newValue.rawValue }
+    }
 
     init(id: UUID = UUID(), category: Category, amount: Int,
          memo: String = "", date: Date = Date(),
          tags: [String] = [], isFixed: Bool = false,
          recurringID: UUID? = nil) {
-        self.id = id; self.category = category; self.amount = amount
-        self.memo = memo; self.date = date
-        self.tags = tags; self.isFixed = isFixed
+        self.id          = id
+        self.categoryRaw = category.rawValue
+        self.amount      = amount
+        self.memo        = memo
+        self.date        = date
+        self.tags        = tags
+        self.isFixed     = isFixed
         self.recurringID = recurringID
     }
-
-    
-    enum CodingKeys: String, CodingKey {
-        case id, category, amount, memo, date, tags, isFixed, recurringID
-    }
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id       = try c.decode(UUID.self,     forKey: .id)
-        category = try c.decode(Category.self, forKey: .category)
-        amount   = try c.decode(Int.self,      forKey: .amount)
-        memo     = try c.decode(String.self,   forKey: .memo)
-        date     = try c.decode(Date.self,     forKey: .date)
-        tags     = try c.decodeIfPresent([String].self, forKey: .tags)    ?? []
-        isFixed  = try c.decodeIfPresent(Bool.self,     forKey: .isFixed) ?? false
-        recurringID = try c.decodeIfPresent(UUID.self,  forKey: .recurringID)
-    }
 }
+
 // MARK: - Daily Section (리스트 그룹핑용)
 struct DaySection {
     let date: Date
@@ -93,7 +90,7 @@ struct MonthlyInsight {
         guard let top = topCategory, topAmount > 0 else {
             return "이번 달은 아직 지출이 없어요"
         }
-        return "이번 달엔 ‘\(top.rawValue)’에 가장 많이 썼어요"
+        return "이번 달엔 '\(top.rawValue)'에 가장 많이 썼어요"
     }
 }
 

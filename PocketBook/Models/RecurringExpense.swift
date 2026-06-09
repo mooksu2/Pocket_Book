@@ -1,14 +1,22 @@
 import Foundation
+import SwiftData
 
 /// 매월 반복되는 고정지출 '규칙'. 실제 지출(Expense)은 결제일이 지나면 자동 생성된다.
-struct RecurringExpense: Codable, Identifiable, Equatable {
-    var id: UUID
-    var name: String
-    var amount: Int            // 원 단위
-    var category: Category
-    var dayOfMonth: Int        // 1...31 (없는 날은 말일로 보정)
-    var isActive: Bool
-    var tags: [String]
+@Model
+final class RecurringExpense {
+    @Attribute(.unique) var id:         UUID
+    var name:       String
+    var amount:     Int            // 원 단위
+    var categoryRaw: String        // SwiftData는 enum 직접 저장 불가 → rawValue로 우회
+    var dayOfMonth: Int            // 1...31 (없는 날은 말일로 보정)
+    var isActive:   Bool
+    var tags:       [String]
+    
+    @Transient
+    var category: Category {
+        get { Category(rawValue: categoryRaw) ?? .etc }
+        set { categoryRaw = newValue.rawValue }
+    }
 
     init(id: UUID = UUID(),
          name: String,
@@ -17,28 +25,13 @@ struct RecurringExpense: Codable, Identifiable, Equatable {
          dayOfMonth: Int,
          isActive: Bool = true,
          tags: [String] = []) {
-        self.id         = id
-        self.name       = name
-        self.amount     = amount
-        self.category   = category
-        self.dayOfMonth = max(1, min(31, dayOfMonth))
-        self.isActive   = isActive
-        self.tags       = tags
-    }
-
-    // 기존 저장 데이터(tags 없음) 호환
-    enum CodingKeys: String, CodingKey {
-        case id, name, amount, category, dayOfMonth, isActive, tags
-    }
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id         = try c.decode(UUID.self,     forKey: .id)
-        name       = try c.decode(String.self,   forKey: .name)
-        amount     = try c.decode(Int.self,      forKey: .amount)
-        category   = try c.decode(Category.self, forKey: .category)
-        dayOfMonth = try c.decode(Int.self,      forKey: .dayOfMonth)
-        isActive   = try c.decode(Bool.self,     forKey: .isActive)
-        tags       = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
+        self.id          = id
+        self.name        = name
+        self.amount      = amount
+        self.categoryRaw = category.rawValue
+        self.dayOfMonth  = max(1, min(31, dayOfMonth))
+        self.isActive    = isActive
+        self.tags        = tags
     }
 
     /// 해당 연·월의 실제 청구 '일(day)'. 말일 보정: 31일 설정 + 2월 → 28/29.
@@ -54,10 +47,10 @@ struct RecurringExpense: Codable, Identifiable, Equatable {
     func chargeDate(year: Int, month: Int) -> Date {
         let cal = Calendar.current
         var c = DateComponents()
-        c.year = year
-        c.month = month
-        c.day = chargeDay(year: year, month: month)
-        c.hour = 9
+        c.year   = year
+        c.month  = month
+        c.day    = chargeDay(year: year, month: month)
+        c.hour   = 9
         c.minute = 0
         return cal.date(from: c) ?? Date()
     }

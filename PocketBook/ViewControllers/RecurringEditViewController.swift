@@ -259,7 +259,6 @@ final class RecurringEditViewController: UIViewController {
     private func refresh() {
         amountLabel.text = amountValue.won
         amountLabel.textColor = amountValue > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
-        let name = nameField.text?.trimmingCharacters(in: .whitespaces) ?? ""
         let valid = amountValue > 0
         saveButton.isEnabled = valid
         saveButton.alpha = valid ? 1 : 0.45

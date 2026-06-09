@@ -116,8 +116,9 @@ final class SettingsViewController: UIViewController {
         notifySwitch.onTintColor = Theme.Color.point
         syncSwitch.addTarget(self, action: #selector(toggleSync), for: .valueChanged)
         notifySwitch.addTarget(self, action: #selector(toggleNotify), for: .valueChanged)
+        // iCloud 동기화는 유료 개발자 계정 필요 — 스위치 비활성화
         syncSwitch.isEnabled = false
-        
+
         let syncRow = toggleRow(
             icon: "icloud", iconColor: Theme.Color.point,
             title: "iCloud 동기화",
@@ -199,7 +200,7 @@ final class SettingsViewController: UIViewController {
             budgetValueLabel.textColor = Theme.Color.tertiaryText
             budgetHintLabel.text = "월 예산을 정하면 메인 화면에 진행률이 표시되고, 초과 시 알림을 받을 수 있어요."
         }
-        syncSwitch.isOn = SettingsStore.shared.iCloudSyncEnabled
+        syncSwitch.isOn = false   // 유료 계정 미지원 — 항상 off
         notifySwitch.isOn = SettingsStore.shared.notificationsEnabled
     }
 
@@ -230,13 +231,8 @@ final class SettingsViewController: UIViewController {
     }
 
     @objc private func toggleSync(_ sw: UISwitch) {
-        Haptic.selection()
-        SettingsStore.shared.iCloudSyncEnabled = sw.isOn
-        if sw.isOn {
-            CloudSyncService.shared.start()
-            CloudSyncService.shared.pullIfAvailable()
-            ExpenseStore.shared.reloadFromDisk()
-        }
+        // 유료 개발자 계정 필요 — 스위치 비활성화 상태라 호출 안 되지만 방어 처리
+        sw.setOn(false, animated: true)
     }
 
     @objc private func toggleNotify(_ sw: UISwitch) {

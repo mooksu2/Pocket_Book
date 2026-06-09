@@ -202,7 +202,7 @@ extension RecurringListViewController: UITableViewDataSource, UITableViewDelegat
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         let item = items[indexPath.row]
-        let delete = UIContextualAction(style: .destructive, title: "삭제") { [weak self] _, _, done in
+        let delete = UIContextualAction(style: .destructive, title: "삭제") { _, _, done in
             RecurringStore.shared.delete(id: item.id)
             done(true)
         }
