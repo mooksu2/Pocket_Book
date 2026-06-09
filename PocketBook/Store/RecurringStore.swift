@@ -1,3 +1,4 @@
+// Store/RecurringStore.swift
 import Foundation
 import SwiftData
 
@@ -6,7 +7,8 @@ extension Notification.Name {
 }
 
 /// 고정지출(반복 규칙) 저장소.
-/// 결제일이 지난 활성 규칙은 자동으로 ExpenseStore에 실제 지출을 생성한다(중복 방지 원장 사용).
+/// 결제일이 지난 활성 규칙은 자동으로 ExpenseStore에 실제 지출을 생성한다.
+/// 중복 방지는 ledger 대신 SwiftData를 직접 조회한다(single source of truth).
 @MainActor
 final class RecurringStore {
 
@@ -15,17 +17,7 @@ final class RecurringStore {
 
     private var context: ModelContext { PocketBookContainer.shared.context }
 
-    // ledger는 단순 문자열 Set → UserDefaults 유지 (SwiftData 전환 불필요)
-    private let ledgerKey = "recurringMaterialized"
-    private var ledger: Set<String> = []
-
     private(set) var items: [RecurringExpense] = []
-
-    // MARK: - 현재 연·월·일 헬퍼
-    private func currentYMD() -> (year: Int, month: Int, day: Int) {
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
-        return (c.year ?? 0, c.month ?? 0, c.day ?? 1)
-    }
 
     // MARK: - CRUD
     func add(_ r: RecurringExpense) {
@@ -58,23 +50,26 @@ final class RecurringStore {
     func item(id: UUID) -> RecurringExpense? { items.first { $0.id == id } }
 
     // MARK: - 자동 생성 (materialization)
+    /// 이번 달 결제일이 지난(또는 오늘인) 활성 규칙을 실제 지출로 생성.
+    /// 이미 생성됐는지는 ExpenseStore(SwiftData)에 직접 질의 — ledger 불필요.
     func materializeDueExpenses() {
-        let t = currentYMD()
+        let now = Date()
+        let year = now.year, month = now.month, day = now.day
+
+        var newExpenses: [Expense] = []
         for r in items where r.isActive {
-            let key = ledgerKeyString(r.id, year: t.year, month: t.month)
-            guard !ledger.contains(key) else { continue }
-            guard r.chargeDay(year: t.year, month: t.month) <= t.day else { continue }
-            let e = Expense(category: r.category,
-                            amount: r.amount,
-                            memo: r.name,
-                            date: r.chargeDate(year: t.year, month: t.month),
-                            tags: r.tags,
-                            isFixed: true,
-                            recurringID: r.id)
-            ExpenseStore.shared.add(e)
-            ledger.insert(key)
+            guard r.chargeDay(year: year, month: month) <= day else { continue }
+            guard !ExpenseStore.shared.hasMaterialized(recurringID: r.id, year: year, month: month) else { continue }
+            newExpenses.append(Expense(
+                category: r.category,
+                amount: r.amount,
+                memo: r.name,
+                date: r.chargeDate(year: year, month: month),
+                tags: r.tags,
+                isFixed: true,
+                recurringID: r.id))
         }
-        persistLedger()
+        ExpenseStore.shared.addBatch(newExpenses)   // save·통지 1회
     }
 
     // MARK: - 이번 달 요약 (허브 화면용)
@@ -83,26 +78,17 @@ final class RecurringStore {
     func monthlyTotal() -> Int { activeItems.reduce(0) { $0 + $1.amount } }
 
     func recordedTotal() -> Int {
-        let t = currentYMD()
+        let now = Date()
         return activeItems
-            .filter { $0.chargeDay(year: t.year, month: t.month) <= t.day }
+            .filter { $0.chargeDay(year: now.year, month: now.month) <= now.day }
             .reduce(0) { $0 + $1.amount }
     }
 
     func pendingTotal() -> Int { monthlyTotal() - recordedTotal() }
 
     func isRecordedThisMonth(_ r: RecurringExpense) -> Bool {
-        let t = currentYMD()
-        return r.chargeDay(year: t.year, month: t.month) <= t.day
-    }
-
-    // MARK: - Ledger (중복 생성 방지 원장) — UserDefaults 유지
-    private func ledgerKeyString(_ id: UUID, year: Int, month: Int) -> String {
-        "\(id.uuidString):\(year)-\(month)"
-    }
-    private func markMaterialized(_ id: UUID, year: Int, month: Int) {
-        ledger.insert(ledgerKeyString(id, year: year, month: month))
-        persistLedger()
+        let now = Date()
+        return r.chargeDay(year: now.year, month: now.month) <= now.day
     }
 
     // MARK: - Persistence
@@ -115,10 +101,6 @@ final class RecurringStore {
         }
     }
 
-    private func persistLedger() {
-        UserDefaults.standard.set(Array(ledger), forKey: ledgerKey)
-    }
-
     func load() {
         do {
             let descriptor = FetchDescriptor<RecurringExpense>(
@@ -128,9 +110,6 @@ final class RecurringStore {
         } catch {
             print("⚠️ RecurringStore load error:", error)
             items = []
-        }
-        if let arr = UserDefaults.standard.array(forKey: ledgerKey) as? [String] {
-            ledger = Set(arr)
         }
     }
 

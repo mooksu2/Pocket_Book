@@ -19,17 +19,78 @@ final class ExpenseStore {
     // MARK: CRUD
     func add(_ expense: Expense) {
         context.insert(expense)
-        persist()
+        do {
+            try context.save()
+            expenses.insert(expense, at: 0)   // 디스크 재조회 없이 캐시에 직접 반영
+            resort()
+        } catch {
+            print("⚠️ ExpenseStore save error:", error)
+            load()   // 실패 시에만 전체 재조회로 정합성 복구
+        }
+        broadcastChange()
+    }
+
+    /// 여러 건을 한 번에 insert — save·통지는 1회만 (materialize 전용)
+    func addBatch(_ list: [Expense]) {
+        guard !list.isEmpty else { return }
+        list.forEach { context.insert($0) }
+        do {
+            try context.save()
+            expenses.append(contentsOf: list)
+            resort()
+        } catch {
+            print("⚠️ ExpenseStore batch save error:", error)
+            load()
+        }
+        broadcastChange()
     }
 
     func update(_ expense: Expense) {
-        persist()
+        let id = expense.id
+        let descriptor = FetchDescriptor<Expense>(predicate: #Predicate { $0.id == id })
+        guard let target = try? context.fetch(descriptor).first else {
+            context.insert(expense)   // 못 찾으면 신규로 방어 처리
+            add(expense)
+            return
+        }
+        target.amount      = expense.amount
+        target.categoryRaw = expense.categoryRaw
+        target.memo        = expense.memo
+        target.date        = expense.date
+        target.tags        = expense.tags
+        target.isFixed     = expense.isFixed
+        target.recurringID = expense.recurringID
+        do {
+            try context.save()
+            resort()   // 캐시는 이미 같은 참조라 정렬만 갱신
+        } catch {
+            print("⚠️ ExpenseStore update error:", error)
+            load()
+        }
+        broadcastChange()
     }
 
     func delete(id: UUID) {
         guard let target = expenses.first(where: { $0.id == id }) else { return }
         context.delete(target)
-        persist()
+        do {
+            try context.save()
+            expenses.removeAll { $0.id == id }
+        } catch {
+            print("⚠️ ExpenseStore delete error:", error)
+            load()
+        }
+        broadcastChange()
+    }
+
+    /// 고정지출이 이번 달에 이미 생성됐는지 DB(캐시) 직접 조회 — ledger 대체
+    func hasMaterialized(recurringID: UUID, year: Int, month: Int) -> Bool {
+        let cal = Calendar.current
+        return expenses.contains {
+            guard $0.recurringID == recurringID else { return false }
+            let c = cal.dateComponents([.year, .month], from: $0.date)
+            return c.year == year && c.month == month
+        }
     }
 
     // MARK: Queries
@@ -53,10 +114,9 @@ final class ExpenseStore {
     }
 
     func totals(year: Int, month: Int) -> [Category: Int] {
-        let list = expenses(year: year, month: month)
-        var result: [Category: Int] = [:]
-        for cat in Category.allCases {
-            result[cat] = list.filter { $0.category == cat }.reduce(0) { $0 + $1.amount }
+        var result = Dictionary(uniqueKeysWithValues: Category.allCases.map { ($0, 0) })
+        for e in expenses(year: year, month: month) {
+            result[e.category, default: 0] += e.amount
         }
         return result
     }
@@ -162,14 +222,9 @@ final class ExpenseStore {
     }
 
     // MARK: Persistence
-    private func persist() {
-        do {
-            try context.save()
-            load()
-        } catch {
-            print("⚠️ ExpenseStore save error:", error)
-        }
-        broadcastChange()
+    /// 캐시 정렬만 갱신 (날짜 내림차순) — 디스크 재조회 없음
+    private func resort() {
+        expenses.sort { $0.date > $1.date }
     }
 
     func load() {

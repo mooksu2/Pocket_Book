@@ -22,6 +22,7 @@ extension Int {
 extension Date {
     var year:  Int { Calendar.current.component(.year,  from: self) }
     var month: Int { Calendar.current.component(.month, from: self) }
+    var day:   Int { Calendar.current.component(.day,   from: self) }
 
     /// "오늘 · 6월 5일", "어제 · 6월 4일", "6월 3일 (화)"
     var sectionTitle: String {

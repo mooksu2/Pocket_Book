@@ -5,6 +5,7 @@ final class AddViewController: UIViewController {
 
     var onSaved: (() -> Void)?
     private var editingExpanse: Expense?
+    private var isSaving = false
     private var selectedCategory: Category = .food
     private var chips: [CategoryChip] = []
     private var amountValue = 0
@@ -283,7 +284,10 @@ final class AddViewController: UIViewController {
     }
 
     @objc private func save() {
-        guard amountValue > 0 else { return }
+        guard !isSaving, amountValue > 0 else { return }
+        isSaving = true
+        saveButton.isEnabled = false
+
         Haptic.success()
         let expense = Expense(
             id: editingExpanse?.id ?? UUID(),
