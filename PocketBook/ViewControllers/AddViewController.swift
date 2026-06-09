@@ -11,6 +11,8 @@ final class AddViewController: UIViewController {
     private var amountValue = 0
     private var selectedTags: [String] = []
     private var isFixed: Bool = false
+    /// 카테고리별 태그·고정여부 임시 캐시 — 칩 전환 시 입력 유지
+    private var tagCache: [Category: (tags: [String], isFixed: Bool)] = [:]
     private let tagPicker = TagPickerView()
     
     // MARK: UI
@@ -47,7 +49,6 @@ final class AddViewController: UIViewController {
         dp.datePickerMode = .date
         dp.preferredDatePickerStyle = .compact
         dp.locale = Locale(identifier: "ko_KR")
-        dp.maximumDate = Date()
         dp.translatesAutoresizingMaskIntoConstraints = false
         return dp
     }()
@@ -83,8 +84,10 @@ final class AddViewController: UIViewController {
         buildLayout()
         tagPicker.configure(for: selectedCategory)
         tagPicker.onChanged = { [weak self] tags, fixed in
-            self?.selectedTags = tags
-            self?.isFixed = fixed
+            guard let self else { return }
+            self.selectedTags = tags
+            self.isFixed = fixed
+            self.tagCache[self.selectedCategory] = (tags, fixed)   // 캐시 동기화
         }
         view.addSubview(hiddenField)
         hiddenField.addTarget(self, action: #selector(amountTyping), for: .editingChanged)
@@ -248,9 +251,11 @@ final class AddViewController: UIViewController {
     @objc private func chipTapped(_ chip: CategoryChip) {
         Haptic.selection()
         selectedCategory = chip.category
-        selectedTags = []
-        isFixed = false
-        tagPicker.configure(for: selectedCategory)
+        // 캐시에 저장된 태그가 있으면 복원, 없으면 빈 상태
+        let cached = tagCache[selectedCategory]
+        selectedTags = cached?.tags ?? []
+        isFixed = cached?.isFixed ?? false
+        tagPicker.configure(for: selectedCategory, preselected: selectedTags, isFixed: isFixed)
         UIView.animate(withDuration: 0.2) {
             self.chips.forEach { $0.isSelected = ($0 === chip) }
         }
@@ -278,13 +283,20 @@ final class AddViewController: UIViewController {
     private func refresh() {
         amountLabel.text = amountValue.won
         amountLabel.textColor = amountValue > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
-        let valid = amountValue > 0
-        saveButton.isEnabled = valid
-        saveButton.alpha = valid ? 1 : 0.45
+        // 버튼은 항상 누를 수 있게 두고, 빈 금액이면 흔들림으로 안내 (alpha로만 비활성 느낌)
+        saveButton.alpha = amountValue > 0 ? 1 : 0.45
     }
 
     @objc private func save() {
-        guard !isSaving, amountValue > 0 else { return }
+        guard !isSaving else { return }
+        // 빈 금액 — 저장 막고 흔들림 + 안내
+        guard amountValue > 0 else {
+            Haptic.warning()
+            shakeAmount()
+            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)
+            focusAmount()
+            return
+        }
         isSaving = true
         saveButton.isEnabled = false
 
@@ -301,6 +313,14 @@ final class AddViewController: UIViewController {
         if editingExpanse == nil { ExpenseStore.shared.add(expense) }
         else { ExpenseStore.shared.update(expense) }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
+    }
+
+    /// 금액 라벨 좌우 흔들기 (빈 금액 저장 시도 피드백)
+    private func shakeAmount() {
+        let anim = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        anim.values = [-10, 10, -8, 8, -4, 4, 0]
+        anim.duration = 0.4
+        amountLabel.layer.add(anim, forKey: "shake")
     }
 
     @objc private func close() { dismiss(animated: true) }

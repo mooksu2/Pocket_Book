@@ -49,8 +49,7 @@ final class ExpenseStore {
         let id = expense.id
         let descriptor = FetchDescriptor<Expense>(predicate: #Predicate { $0.id == id })
         guard let target = try? context.fetch(descriptor).first else {
-            context.insert(expense)   // 못 찾으면 신규로 방어 처리
-            add(expense)
+            add(expense)   // 못 찾으면 신규로 방어 처리 (add 내부에서 insert+save)
             return
         }
         target.amount      = expense.amount

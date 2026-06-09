@@ -113,13 +113,14 @@ final class ExpenseCell: UITableViewCell {
 
         // 태그 알약 다시 그리기
         tagStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        if e.isFixed {
-            tagStack.addArrangedSubview(makeChip("고정지출", color: Theme.Color.point, filled: true))
+        if e.recurringID != nil || e.isFixed {
+            tagStack.addArrangedSubview(makeFixedChip())
         }
         for tag in e.tags {
             tagStack.addArrangedSubview(makeChip(tag, color: e.category.color, filled: false))
         }
-        tagStack.isHidden = e.tags.isEmpty && !e.isFixed
+        let isFixedRow = (e.recurringID != nil || e.isFixed)
+        tagStack.isHidden = e.tags.isEmpty && !isFixedRow
         if !tagStack.isHidden {
             let spacer = UIView()
             spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -128,6 +129,42 @@ final class ExpenseCell: UITableViewCell {
 
         amountLabel.text = "-" + e.amount.won
         timeLabel.text = e.date.timeShort
+    }
+
+    /// 고정지출 전용 칩 — 🔄 아이콘 + "고정" 텍스트로 일반 지출과 명확히 구분
+    private func makeFixedChip() -> UIView {
+        let container = UIView()
+        container.backgroundColor = Theme.Color.point
+        container.layer.cornerRadius = 9
+        container.layer.masksToBounds = true
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let icon = UIImageView(image: UIImage(systemName: "arrow.triangle.2.circlepath"))
+        icon.tintColor = .white
+        icon.contentMode = .scaleAspectFit
+        icon.preferredSymbolConfiguration = .init(pointSize: 9, weight: .bold)
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = UILabel()
+        label.text = "고정"
+        label.font = Theme.Font.caption(11)
+        label.textColor = .white
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(icon)
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            icon.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 7),
+            icon.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 10),
+            icon.heightAnchor.constraint(equalToConstant: 10),
+            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 3),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
+            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 2),
+            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -2),
+        ])
+        container.setContentHuggingPriority(.required, for: .horizontal)
+        return container
     }
 
     private func makeChip(_ text: String, color: UIColor, filled: Bool) -> UIView {

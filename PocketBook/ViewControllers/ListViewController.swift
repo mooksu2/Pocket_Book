@@ -294,7 +294,18 @@ final class ListViewController: UIViewController {
         addButton.addTarget(self, action: #selector(addUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButton.addTarget(self, action: #selector(openAdd), for: .touchUpInside)
         fixedRow.addTarget(self, action: #selector(openFixed), for: .touchUpInside)
+
+        // 좌우 스와이프로 월 이동 (왼쪽=다음 달, 오른쪽=이전 달)
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(swipedLeft))
+        swipeLeft.direction = .left
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(swipedRight))
+        swipeRight.direction = .right
+        tableView.addGestureRecognizer(swipeLeft)
+        tableView.addGestureRecognizer(swipeRight)
     }
+
+    @objc private func swipedLeft()  { shiftMonth(+1) }
+    @objc private func swipedRight() { shiftMonth(-1) }
 
     @objc private func openFixed() {
         Haptic.medium()
@@ -452,53 +463,15 @@ final class ListViewController: UIViewController {
 
     private func presentEditor(for expense: Expense?, successMessage: String) {
         let vc = AddViewController(editing: expense)
-        vc.onSaved = { [weak self] in self?.showToast(successMessage) }
+        vc.onSaved = { [weak self] in
+            guard let self else { return }
+            Toast.show(successMessage, style: .success, in: self.view)
+        }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
         present(nav, animated: true)
     }
 
-    // MARK: Toast
-    private func showToast(_ message: String) {
-        let container = UIView()
-        container.backgroundColor = UIColor.label.withAlphaComponent(0.9)
-        container.roundCorners(Theme.Radius.pill)
-        container.translatesAutoresizingMaskIntoConstraints = false
-
-        let check = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
-        check.tintColor = .systemGreen
-        check.translatesAutoresizingMaskIntoConstraints = false
-
-        let label = UILabel()
-        label.text = message
-        label.font = Theme.Font.title(14)
-        label.textColor = .systemBackground
-        label.translatesAutoresizingMaskIntoConstraints = false
-
-        container.addSubview(check)
-        container.addSubview(label)
-        view.addSubview(container)
-        NSLayoutConstraint.activate([
-            check.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 14),
-            check.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            check.widthAnchor.constraint(equalToConstant: 18),
-            check.heightAnchor.constraint(equalToConstant: 18),
-            label.leadingAnchor.constraint(equalTo: check.trailingAnchor, constant: 8),
-            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
-            label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            container.heightAnchor.constraint(equalToConstant: 40),
-            container.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            container.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -90),
-        ])
-        container.alpha = 0
-        container.transform = CGAffineTransform(translationX: 0, y: 10)
-        UIView.animate(withDuration: 0.3) {
-            container.alpha = 1; container.transform = .identity
-        }
-        UIView.animate(withDuration: 0.3, delay: 1.6) {
-            container.alpha = 0
-        } completion: { _ in container.removeFromSuperview() }
-    }
 }
 
 // MARK: - DataSource / Delegate
@@ -535,24 +508,35 @@ extension ListViewController: UITableViewDataSource, UITableViewDelegate {
     ) -> UISwipeActionsConfiguration? {
         let expense = sections[indexPath.section].expenses[indexPath.row]
         let delete = UIContextualAction(style: .destructive, title: nil) { [weak self] _, _, done in
-            self?.confirmDelete(expense, completion: done)
+            self?.deleteWithUndo(expense)
+            done(true)
         }
         delete.image = UIImage(systemName: "trash.fill")
         delete.backgroundColor = .systemRed
         return UISwipeActionsConfiguration(actions: [delete])
     }
 
-    private func confirmDelete(_ expense: Expense, completion: @escaping (Bool) -> Void) {
-        Haptic.warning()
-        let alert = UIAlertController(
-            title: "지출 삭제",
-            message: "\(expense.category.rawValue) \(expense.amount.won)\n정말 삭제하시겠습니까?",
-            preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in completion(false) })
-        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { _ in
-            ExpenseStore.shared.delete(id: expense.id)
-            completion(true)
-        })
-        present(alert, animated: true)
+    /// alert 없이 즉시 삭제하고, 되돌리기 토스트를 띄운다 (토스 스타일)
+    private func deleteWithUndo(_ expense: Expense) {
+        Haptic.medium()
+        // 복원용 스냅샷 (삭제 후엔 객체가 무효화되므로 값 미리 보관)
+        let snapshot = Expense(
+            id: expense.id,
+            category: expense.category,
+            amount: expense.amount,
+            memo: expense.memo,
+            date: expense.date,
+            tags: expense.tags,
+            isFixed: expense.isFixed,
+            recurringID: expense.recurringID)
+
+        ExpenseStore.shared.delete(id: expense.id)
+
+        Toast.showWithAction("지출이 삭제됐어요",
+                             actionTitle: "되돌리기",
+                             in: view) {
+            Haptic.success()
+            ExpenseStore.shared.add(snapshot)   // 같은 id로 복원
+        }
     }
 }

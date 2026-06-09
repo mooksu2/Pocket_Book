@@ -50,16 +50,27 @@ final class RecurringStore {
     func item(id: UUID) -> RecurringExpense? { items.first { $0.id == id } }
 
     // MARK: - 자동 생성 (materialization)
+    /// 자동 생성 결과 — 스텔스 안내 토스트용
+    struct MaterializeResult {
+        let count: Int             // 이번에 새로 생성된 지출 건수
+        let firstName: String?     // 대표 이름 (가장 먼저 생성된 항목)
+        var isEmpty: Bool { count == 0 }
+    }
+
     /// 이번 달 결제일이 지난(또는 오늘인) 활성 규칙을 실제 지출로 생성.
     /// 이미 생성됐는지는 ExpenseStore(SwiftData)에 직접 질의 — ledger 불필요.
-    func materializeDueExpenses() {
+    /// - Returns: 새로 생성된 건수와 대표 이름 (토스트 안내용)
+    @discardableResult
+    func materializeDueExpenses() -> MaterializeResult {
         let now = Date()
         let year = now.year, month = now.month, day = now.day
 
         var newExpenses: [Expense] = []
+        var firstName: String?
         for r in items where r.isActive {
             guard r.chargeDay(year: year, month: month) <= day else { continue }
             guard !ExpenseStore.shared.hasMaterialized(recurringID: r.id, year: year, month: month) else { continue }
+            if firstName == nil { firstName = r.name }
             newExpenses.append(Expense(
                 category: r.category,
                 amount: r.amount,
@@ -70,6 +81,7 @@ final class RecurringStore {
                 recurringID: r.id))
         }
         ExpenseStore.shared.addBatch(newExpenses)   // save·통지 1회
+        return MaterializeResult(count: newExpenses.count, firstName: firstName)
     }
 
     // MARK: - 이번 달 요약 (허브 화면용)

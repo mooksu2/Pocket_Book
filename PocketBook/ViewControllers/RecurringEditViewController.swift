@@ -10,6 +10,7 @@ final class RecurringEditViewController: UIViewController {
     private var chips: [CategoryChip] = []
     private var amountValue = 0
     private var dayOfMonth = 1
+    private var isSaving = false
     private let tagPicker = TagPickerView()
 
     // MARK: UI
@@ -50,13 +51,25 @@ final class RecurringEditViewController: UIViewController {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private let dayStepper: UIStepper = {
-        let s = UIStepper()
-        s.minimumValue = 1
-        s.maximumValue = 31
-        s.value = 1
-        s.translatesAutoresizingMaskIntoConstraints = false
-        return s
+    /// 결제일 선택 버튼 (탭하면 휠 피커 시트)
+    private let dayChevron: UIImageView = {
+        let iv = UIImageView(image: UIImage(systemName: "chevron.up.chevron.down"))
+        iv.tintColor = Theme.Color.point
+        iv.contentMode = .scaleAspectFit
+        iv.preferredSymbolConfiguration = .init(pointSize: 13, weight: .semibold)
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+    /// 수정 시 안내 힌트
+    private let editHintLabel: UILabel = {
+        let l = UILabel()
+        l.font = Theme.Font.caption(12)
+        l.textColor = Theme.Color.subText
+        l.numberOfLines = 0
+        l.text = "ℹ️ 변경사항은 다음 달 결제분부터 반영돼요. 이번 달에 이미 기록된 지출은 그대로 유지됩니다."
+        l.isHidden = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
     }()
     private lazy var saveButton: UIButton = {
         let b = UIButton(type: .system)
@@ -90,7 +103,6 @@ final class RecurringEditViewController: UIViewController {
         view.addSubview(hiddenField)
         hiddenField.addTarget(self, action: #selector(amountTyping), for: .editingChanged)
         nameField.delegate = self
-        dayStepper.addTarget(self, action: #selector(dayChanged), for: .valueChanged)
 
         tagPicker.setFixedToggleHidden(true)   // 고정지출 화면이라 토글 불필요, 태그만 사용
 
@@ -104,6 +116,9 @@ final class RecurringEditViewController: UIViewController {
                                                name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
                                                name: UIResponder.keyboardWillHideNotification, object: nil)
+
+        // 수정 모드면 안내 힌트 노출
+        editHintLabel.isHidden = (editingItem == nil)
 
         if let it = editingItem { prefill(it) } else { tagPicker.configure(for: selectedCategory) }
         refresh()
@@ -129,11 +144,16 @@ final class RecurringEditViewController: UIViewController {
         let amountTap = UITapGestureRecognizer(target: self, action: #selector(focusAmount))
         amountLabel.addGestureRecognizer(amountTap)
 
-        // 결제일 행: 좌측 라벨 + 우측 스테퍼
-        let dayRow = UIStackView(arrangedSubviews: [dayValueLabel, dayStepper])
+        // 결제일 행: 좌측 라벨 + 우측 chevron (탭하면 휠 피커)
+        let daySpacer = UIView()
+        daySpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let dayRow = UIStackView(arrangedSubviews: [dayValueLabel, daySpacer, dayChevron])
         dayRow.axis = .horizontal
         dayRow.alignment = .center
-        dayRow.distribution = .equalSpacing
+        dayRow.spacing = Theme.Space.sm
+        dayRow.isUserInteractionEnabled = true
+        let dayTap = UITapGestureRecognizer(target: self, action: #selector(openDayPicker))
+        dayRow.addGestureRecognizer(dayTap)
 
         let nameSection = labeledCard("메모", nameField)
         let daySection  = labeledCard("결제일 (매월)", dayRow)
@@ -147,12 +167,14 @@ final class RecurringEditViewController: UIViewController {
             amountSeparator, amountLabel,
             makeFieldLabel("태그"), tagPicker,
             nameSection, daySection,
+            editHintLabel,
         ])
         stack.axis = .vertical
         stack.spacing = Theme.Space.sm
         stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
         stack.setCustomSpacing(Theme.Space.lg, after: amountLabel)
         stack.setCustomSpacing(Theme.Space.lg, after: tagPicker)
+        stack.setCustomSpacing(Theme.Space.md, after: daySection)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(stack)
@@ -182,9 +204,6 @@ final class RecurringEditViewController: UIViewController {
         l.font = Theme.Font.caption(13); l.textColor = Theme.Color.subText
         return l
     }
-    private func spacer(_ h: CGFloat) -> UIView {
-        let v = UIView(); v.heightAnchor.constraint(equalToConstant: h).isActive = true; return v
-    }
     private func labeledCard(_ title: String, _ content: UIView) -> UIView {
         let label = makeFieldLabel(title)
         let bg = UIView()
@@ -205,7 +224,7 @@ final class RecurringEditViewController: UIViewController {
         return stack
     }
 
-    // MARK: Keyboard (저장 버튼을 키보드 위로 — iOS 14 호환)
+    // MARK: Keyboard (저장 버튼을 키보드 위로)
     @objc private func keyboardWillChange(_ note: Notification) {
         guard let value = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
         let kb = view.convert(value, from: nil)
@@ -225,7 +244,6 @@ final class RecurringEditViewController: UIViewController {
         nameField.text = it.name
         dayOfMonth = it.dayOfMonth
         hiddenField.text = "\(it.amount)"
-        dayStepper.value = Double(it.dayOfMonth)
         dayValueLabel.text = "매월 \(it.dayOfMonth)일"
         chips.forEach { $0.isSelected = ($0.category == it.category) }
         tagPicker.configure(for: it.category, preselected: it.tags)
@@ -250,23 +268,43 @@ final class RecurringEditViewController: UIViewController {
         refresh()
     }
 
-    @objc private func dayChanged() {
-        dayOfMonth = Int(dayStepper.value)
-        dayValueLabel.text = "매월 \(dayOfMonth)일"
+    /// 결제일 휠 피커 시트 — 1~31일을 한 번에 스크롤 선택
+    @objc private func openDayPicker() {
         Haptic.selection()
+        view.endEditing(true)
+        let picker = DayPickerSheet(selected: dayOfMonth) { [weak self] day in
+            guard let self else { return }
+            self.dayOfMonth = day
+            self.dayValueLabel.text = "매월 \(day)일"
+            Haptic.selection()
+        }
+        picker.modalPresentationStyle = .pageSheet
+        if let sheet = picker.sheetPresentationController {
+            sheet.detents = [.medium()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(picker, animated: true)
     }
 
     private func refresh() {
         amountLabel.text = amountValue.won
         amountLabel.textColor = amountValue > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
-        let valid = amountValue > 0
-        saveButton.isEnabled = valid
-        saveButton.alpha = valid ? 1 : 0.45
+        saveButton.alpha = amountValue > 0 ? 1 : 0.45
     }
 
     @objc private func save() {
+        guard !isSaving else { return }
+        guard amountValue > 0 else {
+            Haptic.warning()
+            shakeAmount()
+            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)
+            focusAmount()
+            return
+        }
+        isSaving = true
+        saveButton.isEnabled = false
+
         let name = nameField.text?.trimmingCharacters(in: .whitespaces) ?? ""
-        guard amountValue > 0 else { return }
         Haptic.success()
         let item = RecurringExpense(
             id: editingItem?.id ?? UUID(),
@@ -279,6 +317,14 @@ final class RecurringEditViewController: UIViewController {
         if editingItem == nil { RecurringStore.shared.add(item) }
         else { RecurringStore.shared.update(item) }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
+    }
+
+    /// 금액 라벨 흔들기 (빈 금액 저장 시도 피드백)
+    private func shakeAmount() {
+        let anim = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        anim.values = [-10, 10, -8, 8, -4, 4, 0]
+        anim.duration = 0.4
+        amountLabel.layer.add(anim, forKey: "shake")
     }
 
     @objc private func close() { dismiss(animated: true) }
@@ -300,5 +346,77 @@ extension RecurringEditViewController: UITextFieldDelegate {
     func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
         DispatchQueue.main.async { [weak self] in self?.refresh() }
         return true
+    }
+}
+
+// MARK: - DayPickerSheet (1~31일 휠 선택 시트)
+final class DayPickerSheet: UIViewController {
+
+    private let initialDay: Int
+    private let onPick: (Int) -> Void
+    private let picker = UIPickerView()
+
+    init(selected day: Int, onPick: @escaping (Int) -> Void) {
+        self.initialDay = min(max(day, 1), 31)
+        self.onPick = onPick
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = Theme.Color.background
+
+        let titleLabel = UILabel()
+        titleLabel.text = "결제일 선택"
+        titleLabel.font = Theme.Font.title(17)
+        titleLabel.textColor = Theme.Color.mainText
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let doneButton = UIButton(type: .system)
+        doneButton.setTitle("완료", for: .normal)
+        doneButton.titleLabel?.font = Theme.Font.title(16)
+        doneButton.setTitleColor(Theme.Color.point, for: .normal)
+        doneButton.translatesAutoresizingMaskIntoConstraints = false
+        doneButton.addTarget(self, action: #selector(done), for: .touchUpInside)
+
+        picker.dataSource = self
+        picker.delegate = self
+        picker.translatesAutoresizingMaskIntoConstraints = false
+        picker.selectRow(initialDay - 1, inComponent: 0, animated: false)
+
+        view.addSubview(titleLabel)
+        view.addSubview(doneButton)
+        view.addSubview(picker)
+
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
+
+            doneButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            doneButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
+
+            picker.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            picker.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            picker.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            picker.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+        ])
+    }
+
+    @objc private func done() {
+        let day = picker.selectedRow(inComponent: 0) + 1
+        onPick(day)
+        dismiss(animated: true)
+    }
+}
+
+extension DayPickerSheet: UIPickerViewDataSource, UIPickerViewDelegate {
+    func numberOfComponents(in pickerView: UIPickerView) -> Int { 1 }
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int { 31 }
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        "\(row + 1)일"
+    }
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        Haptic.selection()
     }
 }
