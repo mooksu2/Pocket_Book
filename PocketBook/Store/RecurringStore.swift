@@ -31,10 +31,6 @@ final class RecurringStore {
     func add(_ r: RecurringExpense) {
         context.insert(r)
         persistItems()
-        let t = currentYMD()
-        if r.chargeDay(year: t.year, month: t.month) < t.day {
-            markMaterialized(r.id, year: t.year, month: t.month)
-        }
         materializeDueExpenses()
         broadcast()
     }
@@ -113,6 +109,7 @@ final class RecurringStore {
     private func persistItems() {
         do {
             try context.save()
+            load()
         } catch {
             print("⚠️ RecurringStore save error:", error)
         }

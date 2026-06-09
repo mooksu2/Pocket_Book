@@ -165,6 +165,7 @@ final class ExpenseStore {
     private func persist() {
         do {
             try context.save()
+            load()
         } catch {
             print("⚠️ ExpenseStore save error:", error)
         }
