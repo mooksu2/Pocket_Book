@@ -70,7 +70,7 @@ final class RecurringStore {
         for r in items where r.isActive {
             guard r.chargeDay(year: year, month: month) <= day else { continue }
             guard !ExpenseStore.shared.hasMaterialized(recurringID: r.id, year: year, month: month) else { continue }
-            if firstName == nil { firstName = r.name }
+            if firstName == nil, !r.name.isEmpty { firstName = r.name }   // 메모 없는 항목은 대표 이름에서 제외
             newExpenses.append(Expense(
                 category: r.category,
                 amount: r.amount,

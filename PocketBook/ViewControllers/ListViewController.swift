@@ -294,18 +294,7 @@ final class ListViewController: UIViewController {
         addButton.addTarget(self, action: #selector(addUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButton.addTarget(self, action: #selector(openAdd), for: .touchUpInside)
         fixedRow.addTarget(self, action: #selector(openFixed), for: .touchUpInside)
-
-        // 좌우 스와이프로 월 이동 (왼쪽=다음 달, 오른쪽=이전 달)
-        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(swipedLeft))
-        swipeLeft.direction = .left
-        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(swipedRight))
-        swipeRight.direction = .right
-        tableView.addGestureRecognizer(swipeLeft)
-        tableView.addGestureRecognizer(swipeRight)
     }
-
-    @objc private func swipedLeft()  { shiftMonth(+1) }
-    @objc private func swipedRight() { shiftMonth(-1) }
 
     @objc private func openFixed() {
         Haptic.medium()

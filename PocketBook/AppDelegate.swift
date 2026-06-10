@@ -49,7 +49,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate,
         } else {
             message = "고정지출 \(result.count)건이 기록됐어요"
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             Toast.show(message, style: Toast.Style.info, duration: 2.2)
         }
     }

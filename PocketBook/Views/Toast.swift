@@ -32,7 +32,9 @@ enum Toast {
 
         let container = UIView()
         container.backgroundColor = UIColor.label.withAlphaComponent(0.92)
-        container.roundCorners(Theme.Radius.pill)
+        container.layer.cornerRadius = 18
+        container.layer.cornerCurve = .continuous
+        container.clipsToBounds = true
         container.translatesAutoresizingMaskIntoConstraints = false
 
         let icon = UIImageView(image: UIImage(systemName: style.symbol))
@@ -98,7 +100,9 @@ enum Toast {
 
         let container = UIView()
         container.backgroundColor = UIColor.label.withAlphaComponent(0.92)
-        container.roundCorners(Theme.Radius.pill)
+        container.layer.cornerRadius = 18
+        container.layer.cornerCurve = .continuous
+        container.clipsToBounds = true
         container.translatesAutoresizingMaskIntoConstraints = false
 
         let label = UILabel()
