@@ -23,12 +23,16 @@ enum Toast {
         }
     }
 
+    /// 현재 떠 있는 토스트 — 새 토스트가 뜨면 이전 것을 밀어낸다 (연속 삭제 시 겹침 방지)
+    private static weak var current: UIView?
+
     /// 토스트 표시. host가 nil이면 최상단 윈도우에 자동으로 띄움.
     static func show(_ message: String,
                      style: Style = .success,
                      in host: UIView? = nil,
                      duration: TimeInterval = 1.8) {
         guard let target = host ?? topWindow() else { return }
+        current?.removeFromSuperview()
 
         let container = UIView()
         container.backgroundColor = UIColor.label.withAlphaComponent(0.92)
@@ -52,6 +56,7 @@ enum Toast {
         container.addSubview(icon)
         container.addSubview(label)
         target.addSubview(container)
+        current = container
 
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
@@ -97,6 +102,7 @@ enum Toast {
                                duration: TimeInterval = 3.0,
                                onAction: @escaping () -> Void) {
         guard let target = host ?? topWindow() else { return }
+        current?.removeFromSuperview()
 
         let container = UIView()
         container.backgroundColor = UIColor.label.withAlphaComponent(0.92)
@@ -126,10 +132,13 @@ enum Toast {
         container.addSubview(divider)
         container.addSubview(button)
         target.addSubview(container)
+        current = container
 
         var dismissed = false
-        let dismiss = {
-            guard !dismissed else { return }
+        // [weak container]가 없으면 container → button → UIAction → dismiss → container 순환으로
+        // 토스트를 띄울 때마다 한 세트씩 누수된다
+        let dismiss = { [weak container] in
+            guard let container, !dismissed else { return }
             dismissed = true
             UIView.animate(withDuration: 0.25, animations: {
                 container.alpha = 0

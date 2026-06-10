@@ -66,7 +66,7 @@ final class RecurringEditViewController: UIViewController {
         l.font = Theme.Font.caption(12)
         l.textColor = Theme.Color.subText
         l.numberOfLines = 0
-        l.text = "ℹ️ 변경사항은 다음 달 결제분부터 반영돼요. 이번 달에 이미 기록된 지출은 그대로 유지됩니다."
+        l.text = "ℹ️ 변경 내용은 아직 기록되지 않은 결제부터 적용돼요. 이미 기록된 지출은 그대로 유지됩니다."
         l.isHidden = true
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -82,7 +82,14 @@ final class RecurringEditViewController: UIViewController {
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
-    private var saveButtonBottom: NSLayoutConstraint!
+    /// 키보드·저장 버튼에 폼이 가려지지 않도록 전체를 스크롤 가능하게 감싼다
+    private let scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.keyboardDismissMode = .interactive
+        sv.showsVerticalScrollIndicator = false
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
+    }()
 
     // MARK: Init
     init(editing item: RecurringExpense?) {
@@ -112,11 +119,6 @@ final class RecurringEditViewController: UIViewController {
         tapToDismiss.delegate = self
         view.addGestureRecognizer(tapToDismiss)
 
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChange(_:)),
-                                               name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
-                                               name: UIResponder.keyboardWillHideNotification, object: nil)
-
         // 수정 모드면 안내 힌트 노출
         editHintLabel.isHidden = (editingItem == nil)
 
@@ -142,7 +144,18 @@ final class RecurringEditViewController: UIViewController {
 
         // 금액 (탭 → 키패드)
         let amountTap = UITapGestureRecognizer(target: self, action: #selector(focusAmount))
+        amountLabel.isUserInteractionEnabled = true
         amountLabel.addGestureRecognizer(amountTap)
+
+        // 빠른 금액 버튼 (+1000, +5000, +10000, +50000)
+        let quickRow = UIStackView()
+        quickRow.axis = .horizontal
+        quickRow.distribution = .fillEqually
+        quickRow.spacing = Theme.Space.sm
+        quickRow.translatesAutoresizingMaskIntoConstraints = false
+        [1000, 5000, 10000, 50000].forEach { amt in
+            quickRow.addArrangedSubview(makeQuickButton(amt))
+        }
 
         // 결제일 행: 좌측 라벨 + 우측 chevron (탭하면 휠 피커)
         let daySpacer = UIView()
@@ -162,38 +175,48 @@ final class RecurringEditViewController: UIViewController {
         amountSeparator.backgroundColor = Theme.Color.hairline
         amountSeparator.translatesAutoresizingMaskIntoConstraints = false
 
+        // 순서: 카테고리 → 태그 → 구분선 → 금액 → 퀵버튼 → 메모 → 결제일 → 힌트
         let stack = UIStackView(arrangedSubviews: [
             makeFieldLabel("카테고리"), chipRow,
-            amountSeparator, amountLabel,
             makeFieldLabel("태그"), tagPicker,
+            amountSeparator, amountLabel, quickRow,
             nameSection, daySection,
             editHintLabel,
         ])
         stack.axis = .vertical
         stack.spacing = Theme.Space.sm
         stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
-        stack.setCustomSpacing(Theme.Space.lg, after: amountLabel)
         stack.setCustomSpacing(Theme.Space.lg, after: tagPicker)
+        stack.setCustomSpacing(Theme.Space.md, after: amountLabel)
+        stack.setCustomSpacing(Theme.Space.lg, after: quickRow)
         stack.setCustomSpacing(Theme.Space.md, after: daySection)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(stack)
+        view.addSubview(scrollView)
+        scrollView.addSubview(stack)
         view.addSubview(saveButton)
         saveButton.addTarget(self, action: #selector(save), for: .touchUpInside)
 
-        saveButtonBottom = saveButton.bottomAnchor.constraint(
-            equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Theme.Space.md)
-
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.xl),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
+            // 스크롤 영역은 항상 저장 버튼 위에서 끝난다 → 포커스된 필드가 버튼에 가려지지 않는다
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -Theme.Space.sm),
+
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.xl),
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Theme.Space.lg),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Theme.Space.lg),
+            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Space.md),
+            stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
             chipRow.heightAnchor.constraint(equalToConstant: 64),
             amountSeparator.heightAnchor.constraint(equalToConstant: 1),
+            quickRow.heightAnchor.constraint(equalToConstant: 38),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
-            saveButtonBottom,
+            // 키보드가 없으면 safe area 하단, 올라오면 키보드 위 — 시스템이 애니메이션까지 처리
+            saveButton.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Theme.Space.md),
             saveButton.heightAnchor.constraint(equalToConstant: 54),
         ])
     }
@@ -224,19 +247,6 @@ final class RecurringEditViewController: UIViewController {
         return stack
     }
 
-    // MARK: Keyboard (저장 버튼을 키보드 위로)
-    @objc private func keyboardWillChange(_ note: Notification) {
-        guard let value = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
-        let kb = view.convert(value, from: nil)
-        let overlap = max(view.bounds.maxY - kb.minY - view.safeAreaInsets.bottom, 0)
-        saveButtonBottom.constant = -(overlap + Theme.Space.md)
-        UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
-    }
-    @objc private func keyboardWillHide(_ note: Notification) {
-        saveButtonBottom.constant = -Theme.Space.md
-        UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
-    }
-
     // MARK: Logic
     private func prefill(_ it: RecurringExpense) {
         selectedCategory = it.category
@@ -259,6 +269,25 @@ final class RecurringEditViewController: UIViewController {
     }
 
     @objc private func focusAmount() { hiddenField.becomeFirstResponder() }
+
+    private func bump(_ amount: Int) {
+        Haptic.selection()
+        amountValue += amount
+        hiddenField.text = "\(amountValue)"
+        refresh()
+    }
+
+    private func makeQuickButton(_ amount: Int) -> UIButton {
+        let b = UIButton(type: .system)
+        b.setTitle("+\(amount.grouped)", for: .normal)
+        b.titleLabel?.font = Theme.Font.caption(13)
+        b.setTitleColor(Theme.Color.point, for: .normal)
+        b.backgroundColor = Theme.Color.groupedBG
+        b.layer.cornerRadius = 8
+        b.layer.cornerCurve = .continuous
+        b.addAction(UIAction { [weak self] _ in self?.bump(amount) }, for: .touchUpInside)
+        return b
+    }
 
     @objc private func amountTyping() {
         let digits = (hiddenField.text ?? "").filter(\.isNumber)
@@ -306,16 +335,30 @@ final class RecurringEditViewController: UIViewController {
 
         let name = nameField.text?.trimmingCharacters(in: .whitespaces) ?? ""
         Haptic.success()
-        let item = RecurringExpense(
-            id: editingItem?.id ?? UUID(),
-            name: name,
-            amount: amountValue,
-            category: selectedCategory,
-            dayOfMonth: dayOfMonth,
-            isActive: editingItem?.isActive ?? true,
-            tags: Array(tagPicker.selectedTags))
-        if editingItem == nil { RecurringStore.shared.add(item) }
-        else { RecurringStore.shared.update(item) }
+
+        if let target = editingItem {
+            // 편집 도중 다른 경로로 삭제된 규칙이면 조용히 부활시키지 않는다
+            // (modelContext nil 체크는 iOS 17에서 정상 객체에도 nil을 반환할 수 있어 스토어 캐시로 판별)
+            guard RecurringStore.shared.item(id: target.id) != nil else {
+                RecurringStore.shared.load()
+                dismiss(animated: true) { Toast.show("이미 삭제된 고정지출이에요", style: .info) }
+                return
+            }
+            // live @Model 직접 수정 — 새 인스턴스를 만들어 던지면 context에 반영되지 않는다
+            target.name       = name
+            target.amount     = amountValue
+            target.category   = selectedCategory
+            target.dayOfMonth = max(1, min(31, dayOfMonth))
+            target.tags       = Array(tagPicker.selectedTags)
+            RecurringStore.shared.saveChanges()   // 저장 + 이번 달 미생성분 즉시 반영 + 통지
+        } else {
+            RecurringStore.shared.add(RecurringExpense(
+                name: name,
+                amount: amountValue,
+                category: selectedCategory,
+                dayOfMonth: dayOfMonth,
+                tags: Array(tagPicker.selectedTags)))
+        }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
     }
 
@@ -343,6 +386,15 @@ extension RecurringEditViewController: UIGestureRecognizerDelegate {
 
 extension RecurringEditViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ tf: UITextField) -> Bool { tf.resignFirstResponder(); return true }
+    /// 키보드가 올라온 뒤 포커스 필드를 스크롤로 끌어올린다 (저장 버튼에 가려짐 방지)
+    func textFieldDidBeginEditing(_ tf: UITextField) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.view.layoutIfNeeded()
+            let rect = tf.convert(tf.bounds, to: self.scrollView).insetBy(dx: 0, dy: -Theme.Space.lg)
+            self.scrollView.scrollRectToVisible(rect, animated: true)
+        }
+    }
     func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
         DispatchQueue.main.async { [weak self] in self?.refresh() }
         return true

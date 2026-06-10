@@ -11,6 +11,9 @@ final class RecurringExpense {
     var dayOfMonth: Int            // 1...31 (없는 날은 말일로 보정)
     var isActive:   Bool
     var tags:       [String]
+    /// 사용자가 자동 생성분을 삭제해 '이 달은 건너뛰기'로 기록한 달 키 목록 ("2026-06").
+    /// 기본값이 있는 신규 프로퍼티 → 기존 데이터는 SwiftData 경량 마이그레이션으로 자동 보정된다.
+    var skippedMonths: [String] = []
     
     @Transient
     var category: Category {
@@ -32,6 +35,11 @@ final class RecurringExpense {
         self.dayOfMonth  = max(1, min(31, dayOfMonth))
         self.isActive    = isActive
         self.tags        = tags
+    }
+
+    /// skippedMonths에 쓰는 달 키 ("2026-06").
+    static func monthKey(year: Int, month: Int) -> String {
+        String(format: "%04d-%02d", year, month)
     }
 
     /// 해당 연·월의 실제 청구 '일(day)'. 말일 보정: 31일 설정 + 2월 → 28/29.

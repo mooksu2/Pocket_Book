@@ -21,8 +21,12 @@ final class ExpenseStore {
         context.insert(expense)
         do {
             try context.save()
-            expenses.insert(expense, at: 0)   // 디스크 재조회 없이 캐시에 직접 반영
+            expenses.append(expense)   // 디스크 재조회 없이 캐시에 직접 반영
             resort()
+            // 자동 생성분 복원(Undo)이면 '이 달 건너뛰기' 기록 해제
+            if let rid = expense.recurringID {
+                RecurringStore.shared.unskipMonth(recurringID: rid, date: expense.date)
+            }
         } catch {
             print("⚠️ ExpenseStore save error:", error)
             load()   // 실패 시에만 전체 재조회로 정합성 복구
@@ -45,25 +49,14 @@ final class ExpenseStore {
         broadcastChange()
     }
 
-    func update(_ expense: Expense) {
-        let id = expense.id
-        let descriptor = FetchDescriptor<Expense>(predicate: #Predicate { $0.id == id })
-        guard let target = try? context.fetch(descriptor).first else {
-            add(expense)   // 못 찾으면 신규로 방어 처리 (add 내부에서 insert+save)
-            return
-        }
-        target.amount      = expense.amount
-        target.categoryRaw = expense.categoryRaw
-        target.memo        = expense.memo
-        target.date        = expense.date
-        target.tags        = expense.tags
-        target.isFixed     = expense.isFixed
-        target.recurringID = expense.recurringID
+    /// 수정 화면 등에서 live @Model의 프로퍼티를 직접 바꾼 뒤 호출 — 저장 + 정렬 + 통지.
+    /// (임시 @Model을 만들어 필드를 복사하던 update(_:)는 폐기 — recurringID 유실·삭제분 부활 버그의 원인)
+    func saveChanges() {
         do {
             try context.save()
-            resort()   // 캐시는 이미 같은 참조라 정렬만 갱신
+            resort()   // 캐시는 같은 참조라 정렬만 갱신하면 된다
         } catch {
-            print("⚠️ ExpenseStore update error:", error)
+            print("⚠️ ExpenseStore save error:", error)
             load()
         }
         broadcastChange()
@@ -71,10 +64,17 @@ final class ExpenseStore {
 
     func delete(id: UUID) {
         guard let target = expenses.first(where: { $0.id == id }) else { return }
+        // 삭제 후엔 객체 접근이 불안전하므로 필요한 값을 미리 보관
+        let recurringID = target.recurringID
+        let chargeDate  = target.date
         context.delete(target)
         do {
             try context.save()
             expenses.removeAll { $0.id == id }
+            // 자동 생성분 삭제 = '이 달은 건너뛰기' — foreground 복귀 시 재생성(좀비 부활) 방지
+            if let rid = recurringID {
+                RecurringStore.shared.skipMonth(recurringID: rid, date: chargeDate)
+            }
         } catch {
             print("⚠️ ExpenseStore delete error:", error)
             load()
@@ -82,7 +82,11 @@ final class ExpenseStore {
         broadcastChange()
     }
 
-    /// 고정지출이 이번 달에 이미 생성됐는지 DB(캐시) 직접 조회 — ledger 대체
+    /// 해당 id의 지출이 존재하는지 (편집 화면의 삭제 여부 판별용 — modelContext nil 체크는 iOS 17에서 신뢰 불가)
+    func contains(id: UUID) -> Bool { expenses.contains { $0.id == id } }
+
+    /// 고정지출이 해당 달에 이미 생성됐는지 메모리 캐시에서 조회.
+    /// 모든 변경이 @MainActor에서 캐시와 동기 갱신되므로 디스크 재조회 없이 안전하다.
     func hasMaterialized(recurringID: UUID, year: Int, month: Int) -> Bool {
         let cal = Calendar.current
         return expenses.contains {

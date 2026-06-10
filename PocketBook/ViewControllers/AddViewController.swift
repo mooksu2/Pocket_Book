@@ -4,7 +4,7 @@ import UIKit
 final class AddViewController: UIViewController {
 
     var onSaved: (() -> Void)?
-    private var editingExpanse: Expense?
+    private var editingExpense: Expense?
     private var isSaving = false
     private var selectedCategory: Category = .food
     private var chips: [CategoryChip] = []
@@ -64,11 +64,18 @@ final class AddViewController: UIViewController {
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()
-    private var saveButtonBottom: NSLayoutConstraint!
+    /// 키보드·저장 버튼에 폼이 가려지지 않도록 전체를 스크롤 가능하게 감싼다
+    private let scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.keyboardDismissMode = .interactive
+        sv.showsVerticalScrollIndicator = false
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
+    }()
 
     // MARK: Init
     init(editing expense: Expense?) {
-        self.editingExpanse = expense
+        self.editingExpense = expense
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -77,7 +84,7 @@ final class AddViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
-        title = editingExpanse == nil ? "지출 입력" : "지출 수정"
+        title = editingExpense == nil ? "지출 입력" : "지출 수정"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .close, target: self, action: #selector(close))
 
@@ -93,24 +100,19 @@ final class AddViewController: UIViewController {
         hiddenField.addTarget(self, action: #selector(amountTyping), for: .editingChanged)
         memoField.delegate = self
 
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChange(_:)),
-                                               name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
-                                               name: UIResponder.keyboardWillHideNotification, object: nil)
-
         // 빈 곳 탭 → 키패드 내리기 (금액 라벨·컨트롤 위 탭은 제외)
         let tapToDismiss = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         tapToDismiss.cancelsTouchesInView = false
         tapToDismiss.delegate = self
         view.addGestureRecognizer(tapToDismiss)
 
-        if let e = editingExpanse { prefill(e) }
+        if let e = editingExpense { prefill(e) }
         refresh()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if editingExpanse == nil { hiddenField.becomeFirstResponder() } // 입력 즉시 키패드
+        if editingExpense == nil { hiddenField.becomeFirstResponder() } // 입력 즉시 키패드
     }
 
     // MARK: Layout
@@ -159,23 +161,30 @@ final class AddViewController: UIViewController {
         stack.setCustomSpacing(Theme.Space.md, after: amountLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(stack)
+        view.addSubview(scrollView)
+        scrollView.addSubview(stack)
         view.addSubview(saveButton)
         saveButton.addTarget(self, action: #selector(save), for: .touchUpInside)
 
-        saveButtonBottom = saveButton.bottomAnchor.constraint(
-            equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Theme.Space.md)
-
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.xl),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
+            // 스크롤 영역은 항상 저장 버튼 위에서 끝난다 → 포커스된 필드가 버튼에 가려지지 않는다
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -Theme.Space.sm),
+
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.xl),
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Theme.Space.lg),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Theme.Space.lg),
+            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Space.md),
+            stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
             chipRow.heightAnchor.constraint(equalToConstant: 64),
             quickRow.heightAnchor.constraint(equalToConstant: 38),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
-            saveButtonBottom,
+            // 키보드가 없으면 safe area 하단, 올라오면 키보드 위 — 시스템이 애니메이션까지 처리
+            saveButton.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Theme.Space.md),
             saveButton.heightAnchor.constraint(equalToConstant: 54),
         ])
     }
@@ -221,19 +230,6 @@ final class AddViewController: UIViewController {
         b.layer.cornerCurve = .continuous
         b.addAction(UIAction { [weak self] _ in self?.bump(amount) }, for: .touchUpInside)
         return b
-    }
-
-    // MARK: Keyboard (저장 버튼을 키보드 위로 — iOS 14 호환)
-    @objc private func keyboardWillChange(_ note: Notification) {
-        guard let value = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue else { return }
-        let kb = view.convert(value, from: nil)
-        let overlap = max(view.bounds.maxY - kb.minY - view.safeAreaInsets.bottom, 0)
-        saveButtonBottom.constant = -(overlap + Theme.Space.md)
-        UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
-    }
-    @objc private func keyboardWillHide(_ note: Notification) {
-        saveButtonBottom.constant = -Theme.Space.md
-        UIView.animate(withDuration: 0.25) { self.view.layoutIfNeeded() }
     }
 
     // MARK: Logic
@@ -301,17 +297,34 @@ final class AddViewController: UIViewController {
         saveButton.isEnabled = false
 
         Haptic.success()
-        let expense = Expense(
-            id: editingExpanse?.id ?? UUID(),
-            category: selectedCategory,
-            amount: amountValue,
-            memo: memoField.text?.trimmingCharacters(in: .whitespaces) ?? "",
-            date: datePicker.date,
-            tags: selectedTags,
-            isFixed: isFixed)
+        let memo = memoField.text?.trimmingCharacters(in: .whitespaces) ?? ""
         TagLibrary.record(selectedTags, for: selectedCategory)
-        if editingExpanse == nil { ExpenseStore.shared.add(expense) }
-        else { ExpenseStore.shared.update(expense) }
+
+        if let target = editingExpense {
+            // 편집 도중 다른 경로로 삭제된 객체면 조용히 부활시키지 않는다
+            // (modelContext nil 체크는 iOS 17에서 정상 객체에도 nil을 반환할 수 있어 스토어 캐시로 판별)
+            guard ExpenseStore.shared.contains(id: target.id) else {
+                ExpenseStore.shared.reloadFromDisk()
+                dismiss(animated: true) { Toast.show("이미 삭제된 항목이에요", style: .info) }
+                return
+            }
+            // live @Model 직접 수정 — recurringID는 건드리지 않으므로 고정지출 링크가 보존된다
+            target.category = selectedCategory
+            target.amount   = amountValue
+            target.memo     = memo
+            target.date     = datePicker.date
+            target.tags     = selectedTags
+            target.isFixed  = isFixed
+            ExpenseStore.shared.saveChanges()
+        } else {
+            ExpenseStore.shared.add(Expense(
+                category: selectedCategory,
+                amount: amountValue,
+                memo: memo,
+                date: datePicker.date,
+                tags: selectedTags,
+                isFixed: isFixed))
+        }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
     }
 
@@ -330,6 +343,15 @@ final class AddViewController: UIViewController {
 
 extension AddViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ tf: UITextField) -> Bool { tf.resignFirstResponder(); return true }
+    /// 키보드가 올라온 뒤 포커스 필드를 스크롤로 끌어올린다 (저장 버튼에 가려짐 방지)
+    func textFieldDidBeginEditing(_ tf: UITextField) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.view.layoutIfNeeded()
+            let rect = tf.convert(tf.bounds, to: self.scrollView).insetBy(dx: 0, dy: -Theme.Space.lg)
+            self.scrollView.scrollRectToVisible(rect, animated: true)
+        }
+    }
 }
 
 extension AddViewController: UIGestureRecognizerDelegate {
