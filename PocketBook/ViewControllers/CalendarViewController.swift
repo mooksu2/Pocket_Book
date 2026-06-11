@@ -203,7 +203,7 @@ final class CalendarViewController: UIViewController {
                 let cell = CalendarDayCell()
                 if index < leadingBlanks || index >= leadingBlanks + daysInMonth {
                     cell.configure(date: nil, day: nil, column: col,
-                                   hasExpense: false, dotColor: .clear,
+                                   total: nil,
                                    isToday: false, isSelected: false)
                 } else {
                     let day = index - leadingBlanks + 1
@@ -220,8 +220,7 @@ final class CalendarViewController: UIViewController {
 
     private func style(_ cell: CalendarDayCell, day: Int, column: Int) {
         cell.configure(date: dateFor(day), day: day, column: column,
-                       hasExpense: dailyTotals[day] != nil,
-                       dotColor: dailyTops[day]?.color ?? Theme.Color.point,
+                       total: dailyTotals[day],
                        isToday: isToday(day),
                        isSelected: day == selectedDay)
     }

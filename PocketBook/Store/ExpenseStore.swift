@@ -97,10 +97,11 @@ final class ExpenseStore {
     }
 
     // MARK: Queries
-    func expenses(year: Int, month: Int) -> [Expense] {
+    func expenses(year: Int, month: Int, excludingFixed: Bool = false) -> [Expense] {
         let cal = Calendar.current
         return expenses
             .filter {
+                if excludingFixed && $0.isFixed { return false }
                 let c = cal.dateComponents([.year, .month], from: $0.date)
                 return c.year == year && c.month == month
             }
@@ -116,16 +117,16 @@ final class ExpenseStore {
             .sorted { $0.date > $1.date }
     }
 
-    func totals(year: Int, month: Int) -> [Category: Int] {
+    func totals(year: Int, month: Int, excludingFixed: Bool = false) -> [Category: Int] {
         var result = Dictionary(uniqueKeysWithValues: Category.allCases.map { ($0, 0) })
-        for e in expenses(year: year, month: month) {
+        for e in expenses(year: year, month: month, excludingFixed: excludingFixed) {
             result[e.category, default: 0] += e.amount
         }
         return result
     }
 
-    func totalAmount(year: Int, month: Int) -> Int {
-        expenses(year: year, month: month).reduce(0) { $0 + $1.amount }
+    func totalAmount(year: Int, month: Int, excludingFixed: Bool = false) -> Int {
+        expenses(year: year, month: month, excludingFixed: excludingFixed).reduce(0) { $0 + $1.amount }
     }
 
     func budgetStatus(year: Int, month: Int) -> BudgetStatus? {
@@ -216,8 +217,8 @@ final class ExpenseStore {
         return result
     }
 
-    func tagTotals(year: Int, month: Int, category: Category) -> [(tag: String, amount: Int)] {
-        let items = expenses(year: year, month: month).filter { $0.category == category }
+    func tagTotals(year: Int, month: Int, category: Category, excludingFixed: Bool = false) -> [(tag: String, amount: Int)] {
+        let items = expenses(year: year, month: month, excludingFixed: excludingFixed).filter { $0.category == category }
         var dict: [String: Int] = [:]
         for e in items {
             if e.tags.isEmpty {

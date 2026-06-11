@@ -21,14 +21,17 @@ final class ListViewController: UIViewController {
     private let nextButton = ListViewController.navButton("chevron.right")
     
     private let todayButton: UIButton = {
-        let b = UIButton(type: .system)
-        b.setTitle("오늘", for: .normal)
-        b.titleLabel?.font = Theme.Font.caption(12)
-        b.setTitleColor(Theme.Color.point, for: .normal)
-        b.layer.borderColor = Theme.Color.point.cgColor
-        b.layer.borderWidth = 1
-        b.layer.cornerRadius = 9
-        b.contentEdgeInsets = UIEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+        var config = UIButton.Configuration.plain()
+        config.title = "오늘"
+        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
+        config.baseForegroundColor = Theme.Color.point
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.caption(12); return a
+        }
+        let b = UIButton(configuration: config)
+        b.backgroundColor = Theme.Color.pointSoft   // 테두리 → 틴트 (새 칩 언어와 통일)
+        b.layer.cornerRadius = 12
+        b.layer.cornerCurve = .continuous
         b.translatesAutoresizingMaskIntoConstraints = false
         return b
     }()

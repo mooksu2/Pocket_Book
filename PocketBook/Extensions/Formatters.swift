@@ -59,3 +59,17 @@ extension Date {
         return base
     }
 }
+
+// MARK: - 캘린더 셀용 축약 금액
+extension Int {
+    /// 515,000 → "51.5만", 30,000 → "3만", 9,900 → "9,900"
+    var compactWon: String {
+        if self >= 10_000 {
+            let man = (Double(self) / 10_000 * 10).rounded() / 10
+            return man.truncatingRemainder(dividingBy: 1) == 0
+                ? "\(Int(man))만"
+                : String(format: "%.1f만", man)
+        }
+        return grouped
+    }
+}

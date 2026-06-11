@@ -84,10 +84,13 @@ final class TagPickerView: UIView {
     }
 
     private func addPill(_ tag: String) {
-        let b = UIButton(type: .system)
-        b.setTitle(tag, for: .normal)
-        b.titleLabel?.font = Theme.Font.caption(13)
-        b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
+        var config = UIButton.Configuration.plain()
+        config.title = tag
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.caption(13); return a
+        }
+        let b = UIButton(configuration: config)
         b.layer.cornerRadius = 16
         b.layer.cornerCurve  = .continuous
         b.addAction(UIAction { [weak self] _ in self?.toggle(tag, button: b) }, for: .touchUpInside)
@@ -105,7 +108,7 @@ final class TagPickerView: UIView {
     private func style(_ b: UIButton, selected: Bool) {
         // 회색 필 = 선택지, 카테고리색 풀필 = 선택됨
         b.backgroundColor = selected ? category.color : Theme.Color.groupedBG
-        b.setTitleColor(selected ? .white : Theme.Color.subText, for: .normal)
+        b.configuration?.baseForegroundColor = selected ? .white : Theme.Color.subText
     }
 
     @objc private func fixedToggled(_ sw: UISwitch) {

@@ -268,6 +268,11 @@ final class RecurringEditViewController: UIViewController {
         }
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if editingItem == nil { hiddenField.becomeFirstResponder() }   // 신규 등록 즉시 키패드
+    }
+
     @objc private func focusAmount() { hiddenField.becomeFirstResponder() }
 
     private func bump(_ amount: Int) {

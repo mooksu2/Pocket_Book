@@ -37,6 +37,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate,
         completionHandler([.banner, .sound])
     }
 
+    /// 앱을 켜둔 채 자정이 지나거나 시간대가 바뀌면 호출 — 고정지출 자동 기록 + '오늘' 표시 갱신
+    func applicationSignificantTimeChange(_ application: UIApplication) {
+        RecurringStore.shared.materializeDueExpenses()
+        NotificationCenter.default.post(name: .expensesDidChange, object: nil)
+    }
+
     func applicationDidBecomeActive(_ application: UIApplication) {
         let result = RecurringStore.shared.materializeDueExpenses()
         guard !result.isEmpty else { return }

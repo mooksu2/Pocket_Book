@@ -1,7 +1,7 @@
 // Views/CalendarDayCell.swift
 import UIKit
 
-/// 달력의 한 칸. 날짜 숫자 + (지출 있는 날) 점 표시. 선택/오늘 상태 지원.
+/// 달력의 한 칸. 날짜 숫자 + (지출 있는 날) 일별 합계 금액 표시. 선택/오늘 상태 지원.
 final class CalendarDayCell: UIControl {
 
     private(set) var date: Date?
@@ -19,32 +19,36 @@ final class CalendarDayCell: UIControl {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private let dot: UIView = {
-        let v = UIView()
-        v.layer.cornerRadius = 3
-        v.translatesAutoresizingMaskIntoConstraints = false
-        v.isUserInteractionEnabled = false
-        return v
+    /// 일별 지출 합계 (점 대신 정보를 직접 보여준다)
+    private let amountLabel: UILabel = {
+        let l = UILabel()
+        l.font = Theme.Font.money(9, .semibold)
+        l.textColor = Theme.Color.tertiaryText
+        l.textAlignment = .center
+        l.adjustsFontSizeToFitWidth = true
+        l.minimumScaleFactor = 0.8
+        l.isUserInteractionEnabled = false
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
     }()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         addSubview(circle)
         addSubview(dayLabel)
-        addSubview(dot)
+        addSubview(amountLabel)
         NSLayoutConstraint.activate([
             circle.centerXAnchor.constraint(equalTo: centerXAnchor),
-            circle.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -3),
+            circle.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -5),
             circle.widthAnchor.constraint(equalToConstant: 32),
             circle.heightAnchor.constraint(equalToConstant: 32),
 
             dayLabel.centerXAnchor.constraint(equalTo: circle.centerXAnchor),
             dayLabel.centerYAnchor.constraint(equalTo: circle.centerYAnchor),
 
-            dot.centerXAnchor.constraint(equalTo: centerXAnchor),
-            dot.topAnchor.constraint(equalTo: circle.bottomAnchor, constant: 1),
-            dot.widthAnchor.constraint(equalToConstant: 6),
-            dot.heightAnchor.constraint(equalToConstant: 6),
+            amountLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            amountLabel.topAnchor.constraint(equalTo: circle.bottomAnchor, constant: 1),
+            amountLabel.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -2),
         ])
         circle.layer.cornerRadius = 16
     }
@@ -52,7 +56,7 @@ final class CalendarDayCell: UIControl {
 
     /// column: 0 = 일요일 ... 6 = 토요일 (주말 색상용)
     func configure(date: Date?, day: Int?, column: Int,
-                   hasExpense: Bool, dotColor: UIColor,
+                   total: Int?,
                    isToday: Bool, isSelected: Bool) {
         self.date = date
         guard let day = day else {            // 빈 칸
@@ -60,11 +64,12 @@ final class CalendarDayCell: UIControl {
             dayLabel.text = nil
             circle.backgroundColor = .clear
             circle.layer.borderWidth = 0
-            dot.isHidden = true
+            amountLabel.text = nil
             return
         }
         isUserInteractionEnabled = true
         dayLabel.text = "\(day)"
+        amountLabel.text = total.map { $0.compactWon }
 
         // 기본 색 (주말 구분)
         let weekendColor: UIColor
@@ -78,19 +83,17 @@ final class CalendarDayCell: UIControl {
             circle.backgroundColor = Theme.Color.point
             circle.layer.borderWidth = 0
             dayLabel.textColor = .white
-            dot.isHidden = true
+            amountLabel.textColor = Theme.Color.point   // 선택일은 금액도 포인트색
         } else if isToday {
             circle.backgroundColor = Theme.Color.pointSoft
             circle.layer.borderWidth = 0
             dayLabel.textColor = Theme.Color.point
-            dot.isHidden = !hasExpense
-            dot.backgroundColor = dotColor
+            amountLabel.textColor = Theme.Color.tertiaryText
         } else {
             circle.backgroundColor = .clear
             circle.layer.borderWidth = 0
             dayLabel.textColor = weekendColor
-            dot.isHidden = !hasExpense
-            dot.backgroundColor = dotColor
+            amountLabel.textColor = Theme.Color.tertiaryText
         }
     }
 

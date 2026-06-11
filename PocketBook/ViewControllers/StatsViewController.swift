@@ -1,4 +1,4 @@
-// ViewControllers/StatsViewController.swift
+/// ViewControllers/StatsViewController.swift
 import UIKit
 
 final class StatsViewController: UIViewController {
@@ -45,6 +45,23 @@ final class StatsViewController: UIViewController {
         symbol: "chart.pie", title: "표시할 데이터가 없어요",
         subtitle: "이번 달 지출을 기록하면\n여기에서 분석을 볼 수 있어요")
 
+    /// 고정지출(매달 동일한 지출)을 빼고 변동지출만 분석
+    private var excludeFixed = false
+    private lazy var fixedFilterButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.title = "고정지출 제외"
+        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.caption(12); return a
+        }
+        let b = UIButton(configuration: config)
+        b.layer.cornerRadius = 14
+        b.layer.cornerCurve = .continuous
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.addTarget(self, action: #selector(toggleFixedFilter), for: .touchUpInside)
+        return b
+    }()
+
     private func rebuildBreakdown() {
         breakdownStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let sorted = Category.allCases
@@ -63,7 +80,7 @@ final class StatsViewController: UIViewController {
             breakdownStack.addArrangedSubview(row)
 
             if expandedCategory == cat {
-                let tags = ExpenseStore.shared.tagTotals(year: year, month: month, category: cat)
+                let tags = ExpenseStore.shared.tagTotals(year: year, month: month, category: cat, excludingFixed: excludeFixed)
                 for t in tags {
                     let f = amount > 0 ? CGFloat(t.amount) / CGFloat(amount) : 0
                     breakdownStack.addArrangedSubview(makeTagRow(tag: t.tag, amount: t.amount, fraction: f, color: cat.color))
@@ -170,8 +187,12 @@ final class StatsViewController: UIViewController {
         view.addSubview(breakdownTitle)
         view.addSubview(breakdownStack)
         view.addSubview(emptyView)
+        view.addSubview(fixedFilterButton)
 
         NSLayoutConstraint.activate([
+            fixedFilterButton.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: Theme.Space.md),
+            fixedFilterButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.xl),
+
             navRow.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.md),
             navRow.centerXAnchor.constraint(equalTo: view.centerXAnchor),
 
@@ -180,7 +201,7 @@ final class StatsViewController: UIViewController {
             modeControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.xl),
             modeControl.heightAnchor.constraint(equalToConstant: 36),
 
-            chartContainer.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: Theme.Space.lg),
+            chartContainer.topAnchor.constraint(equalTo: fixedFilterButton.bottomAnchor, constant: Theme.Space.sm),
             chartContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.xl),
             chartContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.xl),
             chartContainer.heightAnchor.constraint(equalToConstant: 230),
@@ -211,8 +232,9 @@ final class StatsViewController: UIViewController {
 
     // MARK: Data
     @objc private func reload() {
-        let totals = ExpenseStore.shared.totals(year: year, month: month)
-        let total = ExpenseStore.shared.totalAmount(year: year, month: month)
+        let totals = ExpenseStore.shared.totals(year: year, month: month, excludingFixed: excludeFixed)
+        let total = ExpenseStore.shared.totalAmount(year: year, month: month, excludingFixed: excludeFixed)
+        let rawTotal = ExpenseStore.shared.totalAmount(year: year, month: month)
         monthLabel.text = "\(year)년 \(month)월"
 
         let hasData = total > 0
@@ -221,6 +243,9 @@ final class StatsViewController: UIViewController {
         bars.isHidden  = !hasData || modeControl.selectedSegmentIndex != 1
         modeControl.isHidden = !hasData
         breakdownStack.isHidden = !hasData
+        // 필터로 0이 됐을 때도 토글은 살아 있어야 다시 끌 수 있다 (원본 데이터 기준 표시)
+        fixedFilterButton.isHidden = rawTotal == 0
+        updateFixedFilterAppearance()
 
         guard hasData else { return }
         donut.setData(totals: totals, total: total)
@@ -230,6 +255,18 @@ final class StatsViewController: UIViewController {
         lastTotals = totals
         lastTotal = total
         rebuildBreakdown()
+    }
+
+    @objc private func toggleFixedFilter() {
+        Haptic.selection()
+        excludeFixed.toggle()
+        reload()
+    }
+
+    private func updateFixedFilterAppearance() {
+        // 회색 필 = 꺼짐, 파란 틴트 = 켜짐 (입력 화면 칩과 동일한 언어)
+        fixedFilterButton.backgroundColor = excludeFixed ? Theme.Color.pointSoft : Theme.Color.groupedBG
+        fixedFilterButton.configuration?.baseForegroundColor = excludeFixed ? Theme.Color.point : Theme.Color.subText
     }
 
     @objc private func modeChanged() {

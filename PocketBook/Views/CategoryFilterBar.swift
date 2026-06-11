@@ -172,10 +172,13 @@ final class CategoryFilterBar: UIView {
     }
 
     private func addPill(title: String, cat: Category?) {
-        let b = UIButton(type: .system)
-        b.setTitle(title, for: .normal)
-        b.titleLabel?.font = Theme.Font.caption(13)
-        b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+        var config = UIButton.Configuration.plain()
+        config.title = title
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.caption(13); return a
+        }
+        let b = UIButton(configuration: config)
         b.layer.cornerRadius = 18
         b.layer.cornerCurve = .continuous
         b.addAction(UIAction { [weak self] _ in self?.tap(cat) }, for: .touchUpInside)
@@ -194,8 +197,7 @@ final class CategoryFilterBar: UIView {
             let isOn = (cat == selected)
             let tint = cat?.color ?? Theme.Color.point
             b.backgroundColor = isOn ? tint : Theme.Color.groupedBG
-            b.tintColor = isOn ? .white : Theme.Color.subText
-            b.setTitleColor(isOn ? .white : Theme.Color.subText, for: .normal)
+            b.configuration?.baseForegroundColor = isOn ? .white : Theme.Color.subText
         }
     }
 }
