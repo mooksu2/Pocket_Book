@@ -141,7 +141,19 @@ final class ExpenseStore {
         let monthly = expenses(year: year, month: month)
         let distinctDays = Set(monthly.map { cal.startOfDay(for: $0.date) }).count
         let total = monthly.reduce(0) { $0 + $1.amount }
-        let avg = distinctDays > 0 ? total / distinctDays : 0
+        // '하루 평균'은 기록이 있는 날이 아니라 경과일 기준으로 나눈다
+        // (이번 달 = 오늘까지 경과한 일수, 지난달 = 그 달의 전체 일수)
+        let now = Date()
+        let elapsedDays: Int
+        if year == now.year && month == now.month {
+            elapsedDays = now.day
+        } else if let monthDate = cal.date(from: DateComponents(year: year, month: month)),
+                  let range = cal.range(of: .day, in: .month, for: monthDate) {
+            elapsedDays = range.count
+        } else {
+            elapsedDays = 0
+        }
+        let avg = elapsedDays > 0 ? total / elapsedDays : 0
         return MonthlyInsight(
             topCategory:  (top?.value ?? 0) > 0 ? top?.key : nil,
             topAmount:    top?.value ?? 0,

@@ -178,7 +178,6 @@ final class CategoryFilterBar: UIView {
         b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         b.layer.cornerRadius = 18
         b.layer.cornerCurve = .continuous
-        b.layer.borderWidth = 1
         b.addAction(UIAction { [weak self] _ in self?.tap(cat) }, for: .touchUpInside)
         pills.append((cat, b))
         stack.addArrangedSubview(b)
@@ -194,10 +193,9 @@ final class CategoryFilterBar: UIView {
         for (cat, b) in pills {
             let isOn = (cat == selected)
             let tint = cat?.color ?? Theme.Color.point
-            b.backgroundColor = isOn ? tint : .clear
+            b.backgroundColor = isOn ? tint : Theme.Color.groupedBG
             b.tintColor = isOn ? .white : Theme.Color.subText
             b.setTitleColor(isOn ? .white : Theme.Color.subText, for: .normal)
-            b.layer.borderColor = isOn ? tint.cgColor : Theme.Color.hairline.cgColor
         }
     }
 }

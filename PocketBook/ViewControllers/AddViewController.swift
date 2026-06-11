@@ -225,7 +225,7 @@ final class AddViewController: UIViewController {
         b.setTitle("+\(amount.grouped)", for: .normal)
         b.titleLabel?.font = Theme.Font.caption(13)
         b.setTitleColor(Theme.Color.point, for: .normal)
-        b.backgroundColor = Theme.Color.groupedBG
+        b.backgroundColor = Theme.Color.pointSoft   // 파란 틴트 = 액션 (회색 필 = 입력 필드)
         b.layer.cornerRadius = 8
         b.layer.cornerCurve = .continuous
         b.addAction(UIAction { [weak self] _ in self?.bump(amount) }, for: .touchUpInside)

@@ -38,7 +38,7 @@ final class ListViewController: UIViewController {
         l.text = "이번 달 지출"
         l.font = Theme.Font.caption(13)
         l.textColor = Theme.Color.subText
-        l.textAlignment = .center
+        l.textAlignment = .left
         return l
     }()
     
@@ -46,7 +46,7 @@ final class ListViewController: UIViewController {
         let l = AnimatedCountLabel()
         l.font = Theme.Font.display(44)
         l.textColor = Theme.Color.mainText
-        l.textAlignment = .center
+        l.textAlignment = .left
         l.adjustsFontSizeToFitWidth = true
         l.minimumScaleFactor = 0.5
         return l
@@ -56,7 +56,7 @@ final class ListViewController: UIViewController {
     private let comparisonLabel: UILabel = {
         let l = UILabel()
         l.font = Theme.Font.caption(13)
-        l.textAlignment = .center
+        l.textAlignment = .left
         l.adjustsFontSizeToFitWidth = true
         l.minimumScaleFactor = 0.8
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -66,15 +66,14 @@ final class ListViewController: UIViewController {
     // MARK: Insight strip
     private let insightView: UIView = {
         let v = UIView()
-        v.backgroundColor = Theme.Color.pointSoft
-        v.roundCorners(Theme.Radius.md)
+        v.backgroundColor = .clear
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
     private let insightLabel: UILabel = {
         let l = UILabel()
         l.font = Theme.Font.body(13)
-        l.textColor = Theme.Color.point
+        l.textColor = Theme.Color.subText
         l.numberOfLines = 1
         l.adjustsFontSizeToFitWidth = true
         l.minimumScaleFactor = 0.8
@@ -193,10 +192,24 @@ final class ListViewController: UIViewController {
 
     // MARK: Layout
     private func buildLayout() {
-        let navRow = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton, todayButton])
-        navRow.alignment = .center
-        navRow.spacing = Theme.Space.sm
+        // 월 내비: 대칭형 컨트롤이라 정중앙 배치 (내비 존 = 가운데 / 콘텐츠 존 = 좌측 히어로)
+        let monthGroup = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton])
+        monthGroup.alignment = .center
+        monthGroup.spacing = Theme.Space.sm
+        monthGroup.translatesAutoresizingMaskIntoConstraints = false
+
+        let navRow = UIView()
         navRow.translatesAutoresizingMaskIntoConstraints = false
+        navRow.addSubview(monthGroup)
+        navRow.addSubview(todayButton)
+        todayButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            monthGroup.centerXAnchor.constraint(equalTo: navRow.centerXAnchor),
+            monthGroup.topAnchor.constraint(equalTo: navRow.topAnchor),
+            monthGroup.bottomAnchor.constraint(equalTo: navRow.bottomAnchor),
+            todayButton.trailingAnchor.constraint(equalTo: navRow.trailingAnchor),
+            todayButton.centerYAnchor.constraint(equalTo: navRow.centerYAnchor),
+        ])
 
         insightView.addSubview(insightLabel)
         fixedRow.addSubview(fixedTitleLabel)
@@ -206,7 +219,7 @@ final class ListViewController: UIViewController {
         budgetView.translatesAutoresizingMaskIntoConstraints = false
         let header = UIStackView(arrangedSubviews: [navRow, totalCaption, totalLabel, comparisonLabel, budgetView, insightView, fixedRow])
         header.axis = .vertical
-        header.alignment = .center
+        header.alignment = .fill
         header.spacing = Theme.Space.xs
         header.setCustomSpacing(Theme.Space.md, after: navRow)
         header.setCustomSpacing(Theme.Space.sm, after: totalLabel)
@@ -235,11 +248,11 @@ final class ListViewController: UIViewController {
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            insightView.heightAnchor.constraint(equalToConstant: 40),
+            insightView.heightAnchor.constraint(equalToConstant: 22),
             insightView.leadingAnchor.constraint(equalTo: header.layoutMarginsGuide.leadingAnchor),
             insightView.trailingAnchor.constraint(equalTo: header.layoutMarginsGuide.trailingAnchor),
-            insightLabel.leadingAnchor.constraint(equalTo: insightView.leadingAnchor, constant: Theme.Space.md),
-            insightLabel.trailingAnchor.constraint(equalTo: insightView.trailingAnchor, constant: -Theme.Space.md),
+            insightLabel.leadingAnchor.constraint(equalTo: insightView.leadingAnchor),
+            insightLabel.trailingAnchor.constraint(equalTo: insightView.trailingAnchor),
             insightLabel.centerYAnchor.constraint(equalTo: insightView.centerYAnchor),
 
             fixedRow.heightAnchor.constraint(equalToConstant: 44),

@@ -90,7 +90,6 @@ final class TagPickerView: UIView {
         b.contentEdgeInsets = UIEdgeInsets(top: 0, left: 14, bottom: 0, right: 14)
         b.layer.cornerRadius = 16
         b.layer.cornerCurve  = .continuous
-        b.layer.borderWidth  = 1
         b.addAction(UIAction { [weak self] _ in self?.toggle(tag, button: b) }, for: .touchUpInside)
         style(b, selected: selectedTags.contains(tag))
         pillStack.addArrangedSubview(b)
@@ -104,9 +103,9 @@ final class TagPickerView: UIView {
     }
 
     private func style(_ b: UIButton, selected: Bool) {
-        b.backgroundColor = selected ? category.color : .clear
+        // 회색 필 = 선택지, 카테고리색 풀필 = 선택됨
+        b.backgroundColor = selected ? category.color : Theme.Color.groupedBG
         b.setTitleColor(selected ? .white : Theme.Color.subText, for: .normal)
-        b.layer.borderColor = selected ? category.color.cgColor : Theme.Color.hairline.cgColor
     }
 
     @objc private func fixedToggled(_ sw: UISwitch) {

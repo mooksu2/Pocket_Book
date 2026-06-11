@@ -134,13 +134,13 @@ final class ExpenseCell: UITableViewCell {
     /// 고정지출 전용 칩 — 🔄 아이콘 + "고정" 텍스트로 일반 지출과 명확히 구분
     private func makeFixedChip() -> UIView {
         let container = UIView()
-        container.backgroundColor = Theme.Color.point
+        container.backgroundColor = Theme.Color.pointSoft
         container.layer.cornerRadius = 9
         container.layer.masksToBounds = true
         container.translatesAutoresizingMaskIntoConstraints = false
 
         let icon = UIImageView(image: UIImage(systemName: "arrow.triangle.2.circlepath"))
-        icon.tintColor = .white
+        icon.tintColor = Theme.Color.point
         icon.contentMode = .scaleAspectFit
         icon.preferredSymbolConfiguration = .init(pointSize: 9, weight: .bold)
         icon.translatesAutoresizingMaskIntoConstraints = false
@@ -148,7 +148,7 @@ final class ExpenseCell: UITableViewCell {
         let label = UILabel()
         label.text = "고정"
         label.font = Theme.Font.caption(11)
-        label.textColor = .white
+        label.textColor = Theme.Color.point
         label.translatesAutoresizingMaskIntoConstraints = false
 
         container.addSubview(icon)
