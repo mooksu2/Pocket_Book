@@ -259,10 +259,15 @@ final class RecurringEditViewController: UIViewController {
         tagPicker.configure(for: it.category, preselected: it.tags)
     }
 
+    /// 카테고리 전환 시 태그 선택을 보관했다가 돌아오면 복원 (지출 입력 화면과 동일 UX)
+    private var tagCache: [Category: [String]] = [:]
+
     @objc private func chipTapped(_ chip: CategoryChip) {
         Haptic.selection()
+        tagCache[selectedCategory] = Array(tagPicker.selectedTags)   // 떠나는 카테고리의 선택 보관
         selectedCategory = chip.category
-        tagPicker.configure(for: selectedCategory)   // 카테고리별 태그 갱신
+        tagPicker.configure(for: selectedCategory,
+                            preselected: tagCache[selectedCategory] ?? [])
         UIView.animate(withDuration: 0.2) {
             self.chips.forEach { $0.isSelected = ($0 === chip) }
         }

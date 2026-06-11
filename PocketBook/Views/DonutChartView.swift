@@ -30,6 +30,8 @@ final class DonutChartView: UIView {
     }()
 
     private var pending: (totals: [Category: Int], total: Int)?
+    private var needsRedraw = false
+    private var lastDrawnSize: CGSize = .zero
 
     private let lineWidth: CGFloat = 26
 
@@ -50,6 +52,7 @@ final class DonutChartView: UIView {
 
     func setData(totals: [Category: Int], total: Int) {
         pending = (totals, total)
+        needsRedraw = true
         centerAmount.setValue(total, animated: true)
         setNeedsLayout()
     }
@@ -57,6 +60,12 @@ final class DonutChartView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let data = pending else { return }
+        // 새 데이터가 오거나 크기가 바뀐 경우에만 다시 그린다.
+        // 모든 레이아웃 패스마다 다시 그리면, 토글 버튼 상태 변경 같은 무관한
+        // 레이아웃 갱신에도 진행 중인 애니메이션이 리셋된다.
+        guard needsRedraw || bounds.size != lastDrawnSize else { return }
+        needsRedraw = false
+        lastDrawnSize = bounds.size
         drawDonut(totals: data.totals, total: data.total)
     }
 
