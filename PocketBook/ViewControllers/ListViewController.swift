@@ -98,7 +98,7 @@ final class ListViewController: UIViewController {
         tv.rowHeight = UITableView.automaticDimension
         tv.estimatedRowHeight = 64
         tv.showsVerticalScrollIndicator = false
-        tv.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
+        tv.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 12, right: 0)   // 탭바 회피는 additionalSafeAreaInsets가 처리
         return tv
     }()
     private lazy var emptyView = EmptyStateView(
