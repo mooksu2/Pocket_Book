@@ -8,7 +8,6 @@ final class AddViewController: UIViewController {
     private var isSaving = false
     private var selectedCategory: Category = .food
     private var chips: [CategoryChip] = []
-    private var amountValue = 0
     private var selectedTags: [String] = []
     private var isFixed: Bool = false
     /// 카테고리별 태그·고정여부 임시 캐시 — 칩 전환 시 입력 유지
@@ -16,24 +15,8 @@ final class AddViewController: UIViewController {
     private let tagPicker = TagPickerView()
     
     // MARK: UI
-    private let amountLabel: UILabel = {
-        let l = UILabel()
-        l.text = "₩0"
-        l.font = Theme.Font.money(48, .heavy)
-        l.textColor = Theme.Color.tertiaryText
-        l.textAlignment = .center
-        l.adjustsFontSizeToFitWidth = true
-        l.minimumScaleFactor = 0.5
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    /// 숫자 키패드를 띄우기 위한 숨은 필드
-    private let hiddenField: UITextField = {
-        let tf = UITextField()
-        tf.keyboardType = .numberPad
-        tf.isHidden = true
-        return tf
-    }()
+    /// 금액 입력 블록 (₩라벨 + 키패드 + 퀵버튼) — 고정지출 등록 화면과 공유
+    private let amountInput = AmountInputView()
 
     private let memoField: UITextField = {
         let tf = UITextField()
@@ -96,8 +79,10 @@ final class AddViewController: UIViewController {
             self.isFixed = fixed
             self.tagCache[self.selectedCategory] = (tags, fixed)   // 캐시 동기화
         }
-        view.addSubview(hiddenField)
-        hiddenField.addTarget(self, action: #selector(amountTyping), for: .editingChanged)
+        amountInput.onChanged = { [weak self] amount in
+            // 버튼은 항상 누를 수 있게 두고, 빈 금액이면 alpha로만 비활성 느낌
+            self?.saveButton.alpha = amount > 0 ? 1 : 0.45
+        }
         memoField.delegate = self
 
         // 빈 곳 탭 → 키패드 내리기 (금액 라벨·컨트롤 위 탭은 제외)
@@ -106,13 +91,12 @@ final class AddViewController: UIViewController {
         tapToDismiss.delegate = self
         view.addGestureRecognizer(tapToDismiss)
 
-        if let e = editingExpense { prefill(e) }
-        refresh()
+        if let e = editingExpense { prefill(e) } else { amountInput.setAmount(0) }   // 초기 상태 동기화
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if editingExpense == nil { hiddenField.becomeFirstResponder() } // 입력 즉시 키패드
+        if editingExpense == nil { amountInput.focus() } // 입력 즉시 키패드
     }
 
     // MARK: Layout
@@ -131,34 +115,18 @@ final class AddViewController: UIViewController {
             chipRow.addArrangedSubview(chip)
         }
 
-        // 금액 (탭하면 키패드)
-        let amountTap = UITapGestureRecognizer(target: self, action: #selector(focusAmount))
-        amountLabel.isUserInteractionEnabled = true
-        amountLabel.addGestureRecognizer(amountTap)
-
-        // 빠른 금액 버튼
-        let quickRow = UIStackView()
-        quickRow.axis = .horizontal
-        quickRow.distribution = .fillEqually
-        quickRow.spacing = Theme.Space.sm
-        quickRow.translatesAutoresizingMaskIntoConstraints = false
-        [1000, 5000, 10000, 50000].forEach { amt in
-            quickRow.addArrangedSubview(makeQuickButton(amt))
-        }
-
         let memoSection = labeledCard("메모", memoField)
         let dateSection = labeledCard("날짜", datePicker)
 
         let stack = UIStackView(arrangedSubviews: [
             makeFieldLabel("카테고리"), chipRow,
             makeFieldLabel("태그"), tagPicker,
-            spacer(8), amountLabel, quickRow,
+            spacer(8), amountInput,
             spacer(8), memoSection, dateSection,
         ])
         stack.axis = .vertical
         stack.spacing = Theme.Space.sm
         stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
-        stack.setCustomSpacing(Theme.Space.md, after: amountLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(scrollView)
@@ -179,7 +147,6 @@ final class AddViewController: UIViewController {
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Space.md),
             stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
             chipRow.heightAnchor.constraint(equalToConstant: 64),
-            quickRow.heightAnchor.constraint(equalToConstant: 38),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
@@ -220,26 +187,13 @@ final class AddViewController: UIViewController {
         stack.spacing = 4
         return stack
     }
-    private func makeQuickButton(_ amount: Int) -> UIButton {
-        let b = UIButton(type: .system)
-        b.setTitle("+\(amount.grouped)", for: .normal)
-        b.titleLabel?.font = Theme.Font.caption(13)
-        b.setTitleColor(Theme.Color.point, for: .normal)
-        b.backgroundColor = Theme.Color.pointSoft   // 파란 틴트 = 액션 (회색 필 = 입력 필드)
-        b.layer.cornerRadius = 8
-        b.layer.cornerCurve = .continuous
-        b.addAction(UIAction { [weak self] _ in self?.bump(amount) }, for: .touchUpInside)
-        return b
-    }
-
     // MARK: Logic
     private func prefill(_ e: Expense) {
         selectedCategory = e.category
-        amountValue = e.amount
+        amountInput.setAmount(e.amount)
         memoField.text = e.memo
         datePicker.date = e.date
         chips.forEach { $0.isSelected = ($0.category == e.category) }
-        hiddenField.text = "\(e.amount)"
         selectedTags = e.tags
         isFixed = e.isFixed
         tagPicker.configure(for: e.category, preselected: e.tags, isFixed: e.isFixed)    }
@@ -257,40 +211,14 @@ final class AddViewController: UIViewController {
         }
     }
 
-    @objc private func focusAmount() { hiddenField.becomeFirstResponder() }
-
-    @objc private func amountTyping() {
-        let digits = (hiddenField.text ?? "").filter(\.isNumber)
-        let trimmed = String(digits.prefix(9))           // 9자리 제한
-        hiddenField.text = trimmed
-        amountValue = Int(trimmed) ?? 0
-        refresh()
-    }
-
-    private func bump(_ amount: Int) {
-        Haptic.light()
-        amountValue = min(amountValue + amount, 999_999_999)
-        hiddenField.text = "\(amountValue)"
-        refresh()
-        amountLabel.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
-        UIView.animate(withDuration: 0.2) { self.amountLabel.transform = .identity }
-    }
-
-    private func refresh() {
-        amountLabel.text = amountValue.won
-        amountLabel.textColor = amountValue > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
-        // 버튼은 항상 누를 수 있게 두고, 빈 금액이면 흔들림으로 안내 (alpha로만 비활성 느낌)
-        saveButton.alpha = amountValue > 0 ? 1 : 0.45
-    }
-
     @objc private func save() {
         guard !isSaving else { return }
         // 빈 금액 — 저장 막고 흔들림 + 안내
-        guard amountValue > 0 else {
+        guard amountInput.amount > 0 else {
             Haptic.warning()
-            shakeAmount()
-            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)
-            focusAmount()
+            amountInput.shake()
+            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)   // in: view → keyboardLayoutGuide로 키패드 위에 표시
+            amountInput.focus()
             return
         }
         isSaving = true
@@ -310,7 +238,7 @@ final class AddViewController: UIViewController {
             }
             // live @Model 직접 수정 — recurringID는 건드리지 않으므로 고정지출 링크가 보존된다
             target.category = selectedCategory
-            target.amount   = amountValue
+            target.amount   = amountInput.amount
             target.memo     = memo
             target.date     = datePicker.date
             target.tags     = selectedTags
@@ -319,21 +247,13 @@ final class AddViewController: UIViewController {
         } else {
             ExpenseStore.shared.add(Expense(
                 category: selectedCategory,
-                amount: amountValue,
+                amount: amountInput.amount,
                 memo: memo,
                 date: datePicker.date,
                 tags: selectedTags,
                 isFixed: isFixed))
         }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
-    }
-
-    /// 금액 라벨 좌우 흔들기 (빈 금액 저장 시도 피드백)
-    private func shakeAmount() {
-        let anim = CAKeyframeAnimation(keyPath: "transform.translation.x")
-        anim.values = [-10, 10, -8, 8, -4, 4, 0]
-        anim.duration = 0.4
-        amountLabel.layer.add(anim, forKey: "shake")
     }
 
     @objc private func close() { dismiss(animated: true) }
@@ -357,7 +277,7 @@ extension AddViewController: UITextFieldDelegate {
 extension AddViewController: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard let v = touch.view else { return true }
-        if v.isDescendant(of: amountLabel) || v is UIControl || v is UITextField { return false }
+        if v.isDescendant(of: amountInput) || v is UIControl || v is UITextField { return false }
         return true
     }
 }

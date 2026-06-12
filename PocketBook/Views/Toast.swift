@@ -58,6 +58,16 @@ enum Toast {
         target.addSubview(container)
         current = container
 
+        // 키패드 회피: host(VC view)가 있으면 keyboardLayoutGuide 위에, 없으면 safe area 위에.
+        // keyboardLayoutGuide는 키패드가 없을 땐 safe area 하단에 붙고, 뜨면 자동으로 따라 올라간다.
+        let bottom: NSLayoutConstraint
+        if host != nil {
+            bottom = container.bottomAnchor.constraint(
+                equalTo: target.keyboardLayoutGuide.topAnchor, constant: -16)
+        } else {
+            bottom = container.bottomAnchor.constraint(
+                equalTo: target.safeAreaLayoutGuide.bottomAnchor, constant: -90)
+        }
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
             icon.centerYAnchor.constraint(equalTo: container.centerYAnchor),
@@ -70,7 +80,7 @@ enum Toast {
             container.centerXAnchor.constraint(equalTo: target.centerXAnchor),
             container.leadingAnchor.constraint(greaterThanOrEqualTo: target.leadingAnchor, constant: 24),
             container.trailingAnchor.constraint(lessThanOrEqualTo: target.trailingAnchor, constant: -24),
-            container.bottomAnchor.constraint(equalTo: target.safeAreaLayoutGuide.bottomAnchor, constant: -90),
+            bottom,
         ])
 
         container.alpha = 0
@@ -86,10 +96,17 @@ enum Toast {
 
     /// 현재 화면에 보이는 최상단 윈도우
     private static func topWindow() -> UIView? {
+        // isKeyWindow 기준은 키패드 활성 시 키보드 윈도우를 반환해 토스트가 키패드 뒤에 붙음.
+        // UIRemoteKeyboardWindow / UITextEffectsWindow 같은 시스템 윈도우를 제외하고
+        // 앱 윈도우 중 windowLevel이 가장 높은 것에 붙여서 키패드 위에 표시.
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }
-            .first { $0.isKeyWindow }
+            .filter { !NSStringFromClass(type(of: $0)).contains("Keyboard")
+                   && !NSStringFromClass(type(of: $0)).contains("TextEffects")
+                   && !$0.isHidden }
+            .sorted { $0.windowLevel < $1.windowLevel }
+            .last
     }
 
     /// 되돌리기 버튼이 달린 토스트 (삭제 Undo 등)
@@ -152,6 +169,9 @@ enum Toast {
             dismiss()
         }, for: .touchUpInside)
 
+        let actionBottom = host != nil
+            ? container.bottomAnchor.constraint(equalTo: target.keyboardLayoutGuide.topAnchor, constant: -16)
+            : container.bottomAnchor.constraint(equalTo: target.safeAreaLayoutGuide.bottomAnchor, constant: -90)
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
             label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
@@ -167,7 +187,7 @@ enum Toast {
             container.centerXAnchor.constraint(equalTo: target.centerXAnchor),
             container.leadingAnchor.constraint(greaterThanOrEqualTo: target.leadingAnchor, constant: 24),
             container.trailingAnchor.constraint(lessThanOrEqualTo: target.trailingAnchor, constant: -24),
-            container.bottomAnchor.constraint(equalTo: target.safeAreaLayoutGuide.bottomAnchor, constant: -90),
+            actionBottom,
         ])
 
         container.alpha = 0

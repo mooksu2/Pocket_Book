@@ -8,7 +8,6 @@ final class RecurringEditViewController: UIViewController {
     private let editingItem: RecurringExpense?
     private var selectedCategory: Category = .food
     private var chips: [CategoryChip] = []
-    private var amountValue = 0
     private var dayOfMonth = 1
     private var isSaving = false
     private let tagPicker = TagPickerView()
@@ -24,25 +23,8 @@ final class RecurringEditViewController: UIViewController {
         tf.translatesAutoresizingMaskIntoConstraints = false
         return tf
     }()
-    private let amountLabel: UILabel = {
-        let l = UILabel()
-        l.text = "₩0"
-        l.font = Theme.Font.money(48, .heavy)
-        l.textColor = Theme.Color.tertiaryText
-        l.textAlignment = .center
-        l.adjustsFontSizeToFitWidth = true
-        l.minimumScaleFactor = 0.5
-        l.isUserInteractionEnabled = true
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    /// 숫자 키패드용 숨은 필드
-    private let hiddenField: UITextField = {
-        let tf = UITextField()
-        tf.keyboardType = .numberPad
-        tf.isHidden = true
-        return tf
-    }()
+    /// 금액 입력 블록 (₩라벨 + 키패드 + 퀵버튼) — 지출 입력 화면과 공유
+    private let amountInput = AmountInputView()
     private let dayValueLabel: UILabel = {
         let l = UILabel()
         l.text = "매월 1일"
@@ -107,8 +89,10 @@ final class RecurringEditViewController: UIViewController {
             barButtonSystemItem: .close, target: self, action: #selector(close))
 
         buildLayout()
-        view.addSubview(hiddenField)
-        hiddenField.addTarget(self, action: #selector(amountTyping), for: .editingChanged)
+        amountInput.onChanged = { [weak self] amount in
+            // 버튼은 항상 누를 수 있게 두고, 빈 금액이면 alpha로만 비활성 느낌
+            self?.saveButton.alpha = amount > 0 ? 1 : 0.45
+        }
         nameField.delegate = self
 
         tagPicker.setFixedToggleHidden(true)   // 고정지출 화면이라 토글 불필요, 태그만 사용
@@ -122,8 +106,10 @@ final class RecurringEditViewController: UIViewController {
         // 수정 모드면 안내 힌트 노출
         editHintLabel.isHidden = (editingItem == nil)
 
-        if let it = editingItem { prefill(it) } else { tagPicker.configure(for: selectedCategory) }
-        refresh()
+        if let it = editingItem { prefill(it) } else {
+            tagPicker.configure(for: selectedCategory)
+            amountInput.setAmount(0)   // 초기 상태 동기화
+        }
     }
 
     // MARK: Layout
@@ -140,21 +126,6 @@ final class RecurringEditViewController: UIViewController {
             chip.addTarget(self, action: #selector(chipTapped(_:)), for: .touchUpInside)
             chips.append(chip)
             chipRow.addArrangedSubview(chip)
-        }
-
-        // 금액 (탭 → 키패드)
-        let amountTap = UITapGestureRecognizer(target: self, action: #selector(focusAmount))
-        amountLabel.isUserInteractionEnabled = true
-        amountLabel.addGestureRecognizer(amountTap)
-
-        // 빠른 금액 버튼 (+1000, +5000, +10000, +50000)
-        let quickRow = UIStackView()
-        quickRow.axis = .horizontal
-        quickRow.distribution = .fillEqually
-        quickRow.spacing = Theme.Space.sm
-        quickRow.translatesAutoresizingMaskIntoConstraints = false
-        [1000, 5000, 10000, 50000].forEach { amt in
-            quickRow.addArrangedSubview(makeQuickButton(amt))
         }
 
         // 결제일 행: 좌측 라벨 + 우측 chevron (탭하면 휠 피커)
@@ -179,7 +150,7 @@ final class RecurringEditViewController: UIViewController {
         let stack = UIStackView(arrangedSubviews: [
             makeFieldLabel("카테고리"), chipRow,
             makeFieldLabel("태그"), tagPicker,
-            amountSeparator, amountLabel, quickRow,
+            amountSeparator, amountInput,
             nameSection, daySection,
             editHintLabel,
         ])
@@ -187,8 +158,7 @@ final class RecurringEditViewController: UIViewController {
         stack.spacing = Theme.Space.sm
         stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
         stack.setCustomSpacing(Theme.Space.lg, after: tagPicker)
-        stack.setCustomSpacing(Theme.Space.md, after: amountLabel)
-        stack.setCustomSpacing(Theme.Space.lg, after: quickRow)
+        stack.setCustomSpacing(Theme.Space.lg, after: amountInput)
         stack.setCustomSpacing(Theme.Space.md, after: daySection)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
@@ -211,7 +181,6 @@ final class RecurringEditViewController: UIViewController {
             stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
             chipRow.heightAnchor.constraint(equalToConstant: 64),
             amountSeparator.heightAnchor.constraint(equalToConstant: 1),
-            quickRow.heightAnchor.constraint(equalToConstant: 38),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
@@ -250,10 +219,9 @@ final class RecurringEditViewController: UIViewController {
     // MARK: Logic
     private func prefill(_ it: RecurringExpense) {
         selectedCategory = it.category
-        amountValue = it.amount
+        amountInput.setAmount(it.amount)
         nameField.text = it.name
         dayOfMonth = it.dayOfMonth
-        hiddenField.text = "\(it.amount)"
         dayValueLabel.text = "매월 \(it.dayOfMonth)일"
         chips.forEach { $0.isSelected = ($0.category == it.category) }
         tagPicker.configure(for: it.category, preselected: it.tags)
@@ -275,36 +243,7 @@ final class RecurringEditViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if editingItem == nil { hiddenField.becomeFirstResponder() }   // 신규 등록 즉시 키패드
-    }
-
-    @objc private func focusAmount() { hiddenField.becomeFirstResponder() }
-
-    private func bump(_ amount: Int) {
-        Haptic.selection()
-        amountValue += amount
-        hiddenField.text = "\(amountValue)"
-        refresh()
-    }
-
-    private func makeQuickButton(_ amount: Int) -> UIButton {
-        let b = UIButton(type: .system)
-        b.setTitle("+\(amount.grouped)", for: .normal)
-        b.titleLabel?.font = Theme.Font.caption(13)
-        b.setTitleColor(Theme.Color.point, for: .normal)
-        b.backgroundColor = Theme.Color.pointSoft   // 파란 틴트 = 액션 (회색 필 = 입력 필드)
-        b.layer.cornerRadius = 8
-        b.layer.cornerCurve = .continuous
-        b.addAction(UIAction { [weak self] _ in self?.bump(amount) }, for: .touchUpInside)
-        return b
-    }
-
-    @objc private func amountTyping() {
-        let digits = (hiddenField.text ?? "").filter(\.isNumber)
-        let trimmed = String(digits.prefix(9))
-        hiddenField.text = trimmed
-        amountValue = Int(trimmed) ?? 0
-        refresh()
+        if editingItem == nil { amountInput.focus() }   // 신규 등록 즉시 키패드
     }
 
     /// 결제일 휠 피커 시트 — 1~31일을 한 번에 스크롤 선택
@@ -325,19 +264,13 @@ final class RecurringEditViewController: UIViewController {
         present(picker, animated: true)
     }
 
-    private func refresh() {
-        amountLabel.text = amountValue.won
-        amountLabel.textColor = amountValue > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
-        saveButton.alpha = amountValue > 0 ? 1 : 0.45
-    }
-
     @objc private func save() {
         guard !isSaving else { return }
-        guard amountValue > 0 else {
+        guard amountInput.amount > 0 else {
             Haptic.warning()
-            shakeAmount()
-            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)
-            focusAmount()
+            amountInput.shake()
+            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)   // in: view → keyboardLayoutGuide로 키패드 위에 표시
+            amountInput.focus()
             return
         }
         isSaving = true
@@ -356,7 +289,7 @@ final class RecurringEditViewController: UIViewController {
             }
             // live @Model 직접 수정 — 새 인스턴스를 만들어 던지면 context에 반영되지 않는다
             target.name       = name
-            target.amount     = amountValue
+            target.amount     = amountInput.amount
             target.category   = selectedCategory
             target.dayOfMonth = max(1, min(31, dayOfMonth))
             target.tags       = Array(tagPicker.selectedTags)
@@ -364,20 +297,12 @@ final class RecurringEditViewController: UIViewController {
         } else {
             RecurringStore.shared.add(RecurringExpense(
                 name: name,
-                amount: amountValue,
+                amount: amountInput.amount,
                 category: selectedCategory,
                 dayOfMonth: dayOfMonth,
                 tags: Array(tagPicker.selectedTags)))
         }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
-    }
-
-    /// 금액 라벨 흔들기 (빈 금액 저장 시도 피드백)
-    private func shakeAmount() {
-        let anim = CAKeyframeAnimation(keyPath: "transform.translation.x")
-        anim.values = [-10, 10, -8, 8, -4, 4, 0]
-        anim.duration = 0.4
-        amountLabel.layer.add(anim, forKey: "shake")
     }
 
     @objc private func close() { dismiss(animated: true) }
@@ -389,7 +314,7 @@ extension RecurringEditViewController: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard let v = touch.view else { return true }
         // 금액 라벨·버튼·스위치·텍스트필드 위 탭은 무시 (키패드 토글 충돌 방지)
-        if v.isDescendant(of: amountLabel) || v is UIControl || v is UITextField { return false }
+        if v.isDescendant(of: amountInput) || v is UIControl || v is UITextField { return false }
         return true
     }
 }
@@ -404,10 +329,6 @@ extension RecurringEditViewController: UITextFieldDelegate {
             let rect = tf.convert(tf.bounds, to: self.scrollView).insetBy(dx: 0, dy: -Theme.Space.lg)
             self.scrollView.scrollRectToVisible(rect, animated: true)
         }
-    }
-    func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-        DispatchQueue.main.async { [weak self] in self?.refresh() }
-        return true
     }
 }
 
