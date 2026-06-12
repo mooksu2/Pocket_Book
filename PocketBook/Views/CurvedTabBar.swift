@@ -1,7 +1,6 @@
 // Views/CurvedTabBar.swift
 import UIKit
 
-/// 토스 스타일 곡선 탭바. 상단이 가운데로 살짝 솟는 곡선 + 선택 시 채워짐/색전환/튕김 애니메이션.
 /// UITabBar를 대체하며, 탭 선택을 onSelect로 알린다.
 final class CurvedTabBar: UIView {
 

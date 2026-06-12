@@ -22,7 +22,7 @@ final class ListViewController: UIViewController {
     
     private let todayButton: UIButton = {
         var config = UIButton.Configuration.plain()
-        config.title = "오늘"
+        config.title = "이번 달로 이동"
         config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
         config.baseForegroundColor = Theme.Color.point
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
