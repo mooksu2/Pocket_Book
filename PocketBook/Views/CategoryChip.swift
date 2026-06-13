@@ -38,7 +38,7 @@ final class CategoryChip: UIControl {
         NSLayoutConstraint.activate([
             stack.centerXAnchor.constraint(equalTo: centerXAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            heightAnchor.constraint(equalToConstant: 64),
+            heightAnchor.constraint(equalTo: widthAnchor),   // 정사각형
         ])
         updateAppearance()
     }

@@ -25,22 +25,22 @@ final class RecurringEditViewController: UIViewController {
     }()
     /// 금액 입력 블록 (₩라벨 + 키패드 + 퀵버튼) — 지출 입력 화면과 공유
     private let amountInput = AmountInputView()
-    private let dayValueLabel: UILabel = {
-        let l = UILabel()
-        l.text = "매월 1일"
-        l.font = Theme.Font.title(16)
-        l.textColor = Theme.Color.mainText
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    /// 결제일 선택 버튼 (탭하면 휠 피커 시트)
-    private let dayChevron: UIImageView = {
-        let iv = UIImageView(image: UIImage(systemName: "chevron.up.chevron.down"))
-        iv.tintColor = Theme.Color.point
-        iv.contentMode = .scaleAspectFit
-        iv.preferredSymbolConfiguration = .init(pointSize: 13, weight: .semibold)
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+    /// 결제일 선택 버튼 (탭하면 휠 피커 시트) — "매월 N일 ›"
+    private lazy var dayButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.baseForegroundColor = Theme.Color.mainText
+        config.image = UIImage(systemName: "chevron.right",
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+        config.imagePlacement = .trailing
+        config.imagePadding = 6
+        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 4)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.body(15); return a
+        }
+        let b = UIButton(configuration: config)
+        b.tintColor = Theme.Color.tertiaryText
+        b.translatesAutoresizingMaskIntoConstraints = false
+        return b
     }()
     /// 수정 시 안내 힌트
     private let editHintLabel: UILabel = {
@@ -114,7 +114,7 @@ final class RecurringEditViewController: UIViewController {
 
     // MARK: Layout
     private func buildLayout() {
-        // 카테고리 칩 4개
+        // 카테고리 타일 4개
         let chipRow = UIStackView()
         chipRow.axis = .horizontal
         chipRow.distribution = .fillEqually
@@ -128,39 +128,42 @@ final class RecurringEditViewController: UIViewController {
             chipRow.addArrangedSubview(chip)
         }
 
-        // 결제일 행: 좌측 라벨 + 우측 chevron (탭하면 휠 피커)
-        let daySpacer = UIView()
-        daySpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let dayRow = UIStackView(arrangedSubviews: [dayValueLabel, daySpacer, dayChevron])
-        dayRow.axis = .horizontal
-        dayRow.alignment = .center
-        dayRow.spacing = Theme.Space.sm
-        dayRow.isUserInteractionEnabled = true
-        let dayTap = UITapGestureRecognizer(target: self, action: #selector(openDayPicker))
-        dayRow.addGestureRecognizer(dayTap)
+        // 1) 금액 히어로 — 카드 없이 회색 배경에 직접
+        amountInput.caption = "매달 얼마가 나가나요?"
 
-        let nameSection = labeledCard("메모", nameField)
-        let daySection  = labeledCard("결제일 (매월)", dayRow)
+        // 2) 카테고리 카드
+        let catCard = card()
+        let catStack = UIStackView(arrangedSubviews: [makeFieldLabel("카테고리"), chipRow])
+        catStack.axis = .vertical; catStack.spacing = Theme.Space.sm
+        embed(catStack, in: catCard)
 
-        let amountSeparator = UIView()
-        amountSeparator.backgroundColor = Theme.Color.hairline
-        amountSeparator.translatesAutoresizingMaskIntoConstraints = false
+        // 3) 태그 카드 (고정지출 화면이라 토글 없음)
+        tagPicker.setFixedToggleHidden(true)
+        let tagCard = card()
+        let tagStack = UIStackView(arrangedSubviews: [makeFieldLabel("태그"), tagPicker])
+        tagStack.axis = .vertical; tagStack.spacing = Theme.Space.sm
+        embed(tagStack, in: tagCard)
 
-        // 순서: 카테고리 → 태그 → 구분선 → 금액 → 퀵버튼 → 메모 → 결제일 → 힌트
-        let stack = UIStackView(arrangedSubviews: [
-            makeFieldLabel("카테고리"), chipRow,
-            makeFieldLabel("태그"), tagPicker,
-            amountSeparator, amountInput,
-            nameSection, daySection,
-            editHintLabel,
-        ])
+        // 4) 옵션 카드 — 메모 / 결제일 (행 형태)
+        nameField.textAlignment = .right
+        let memoRow = optionRow("메모", nameField)
+        dayButton.addTarget(self, action: #selector(openDayPicker), for: .touchUpInside)
+        dayButton.addTarget(self, action: #selector(dayButtonDown), for: [.touchDown, .touchDragEnter])
+        dayButton.addTarget(self, action: #selector(dayButtonUp), for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+        updateDayButton()
+        let dayRow = optionRow("결제일", dayButton)
+        let optionCard = card()
+        let optStack = UIStackView(arrangedSubviews: [memoRow, hairline(), dayRow])
+        optStack.axis = .vertical; optStack.spacing = Theme.Space.md
+        embed(optStack, in: optionCard)
+
+        let stack = UIStackView(arrangedSubviews: [amountInput, catCard, tagCard, optionCard, editHintLabel])
         stack.axis = .vertical
-        stack.spacing = Theme.Space.sm
-        stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
-        stack.setCustomSpacing(Theme.Space.lg, after: tagPicker)
-        stack.setCustomSpacing(Theme.Space.lg, after: amountInput)
-        stack.setCustomSpacing(Theme.Space.md, after: daySection)
+        stack.spacing = Theme.Space.md
+        stack.setCustomSpacing(Theme.Space.xl, after: amountInput)
         stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.layoutMargins = UIEdgeInsets(top: Theme.Space.xl, left: 0, bottom: 0, right: 0)
 
         view.addSubview(scrollView)
         scrollView.addSubview(stack)
@@ -168,23 +171,19 @@ final class RecurringEditViewController: UIViewController {
         saveButton.addTarget(self, action: #selector(save), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            // 스크롤 영역은 항상 저장 버튼 위에서 끝난다 → 포커스된 필드가 버튼에 가려지지 않는다
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -Theme.Space.sm),
 
-            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.xl),
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.md),
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Theme.Space.lg),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Theme.Space.lg),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Space.md),
             stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
-            chipRow.heightAnchor.constraint(equalToConstant: 64),
-            amountSeparator.heightAnchor.constraint(equalToConstant: 1),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
-            // 키보드가 없으면 safe area 하단, 올라오면 키보드 위 — 시스템이 애니메이션까지 처리
             saveButton.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Theme.Space.md),
             saveButton.heightAnchor.constraint(equalToConstant: 54),
         ])
@@ -193,27 +192,64 @@ final class RecurringEditViewController: UIViewController {
     // MARK: Builders
     private func makeFieldLabel(_ t: String) -> UILabel {
         let l = UILabel(); l.text = t
-        l.font = Theme.Font.caption(13); l.textColor = Theme.Color.subText
+        l.font = Theme.Font.title(15); l.textColor = Theme.Color.mainText
         return l
     }
-    private func labeledCard(_ title: String, _ content: UIView) -> UIView {
-        let label = makeFieldLabel(title)
-        let bg = UIView()
-        bg.backgroundColor = Theme.Color.groupedBG
-        bg.roundCorners(Theme.Radius.sm)
-        bg.translatesAutoresizingMaskIntoConstraints = false
+    private func card(padding: UIEdgeInsets = UIEdgeInsets(top: Theme.Space.lg, left: Theme.Space.lg,
+                                                          bottom: Theme.Space.lg, right: Theme.Space.lg)) -> UIView {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.card
+        v.layer.cornerRadius = Theme.Radius.lg
+        v.layer.cornerCurve = .continuous
+        v.translatesAutoresizingMaskIntoConstraints = false
+        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
+        v.layoutMargins = padding
+        return v
+    }
+    private func embed(_ content: UIView, in card: UIView) {
         content.translatesAutoresizingMaskIntoConstraints = false
-        bg.addSubview(content)
+        card.addSubview(content)
+        let m = card.layoutMarginsGuide
         NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: Theme.Space.md),
-            content.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -Theme.Space.md),
-            content.topAnchor.constraint(equalTo: bg.topAnchor, constant: 12),
-            content.bottomAnchor.constraint(equalTo: bg.bottomAnchor, constant: -12),
+            content.topAnchor.constraint(equalTo: m.topAnchor),
+            content.leadingAnchor.constraint(equalTo: m.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: m.trailingAnchor),
+            content.bottomAnchor.constraint(equalTo: m.bottomAnchor),
         ])
-        let stack = UIStackView(arrangedSubviews: [label, bg])
-        stack.axis = .vertical
-        stack.spacing = 4
-        return stack
+    }
+    private func optionRow(_ title: String, _ control: UIView) -> UIView {
+        let label = UILabel()
+        label.text = title
+        label.font = Theme.Font.title(15)
+        label.textColor = Theme.Color.mainText
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        let spacer = UIView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let row = UIStackView(arrangedSubviews: [label, spacer, control])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = Theme.Space.md
+        return row
+    }
+    private func hairline() -> UIView {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.hairline
+        v.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return v
+    }
+    private func updateDayButton() {
+        dayButton.configuration?.title = "매월 \(dayOfMonth)일"
+    }
+    @objc private func dayButtonDown() {
+        UIView.animate(withDuration: 0.1) { self.dayButton.alpha = 0.4 }
+    }
+    @objc private func dayButtonUp() {
+        UIView.animate(withDuration: 0.1) { self.dayButton.alpha = 1 }
     }
 
     // MARK: Logic
@@ -222,7 +258,7 @@ final class RecurringEditViewController: UIViewController {
         amountInput.setAmount(it.amount)
         nameField.text = it.name
         dayOfMonth = it.dayOfMonth
-        dayValueLabel.text = "매월 \(it.dayOfMonth)일"
+        updateDayButton()
         chips.forEach { $0.isSelected = ($0.category == it.category) }
         tagPicker.configure(for: it.category, preselected: it.tags)
     }
@@ -253,7 +289,7 @@ final class RecurringEditViewController: UIViewController {
         let picker = DayPickerSheet(selected: dayOfMonth) { [weak self] day in
             guard let self else { return }
             self.dayOfMonth = day
-            self.dayValueLabel.text = "매월 \(day)일"
+            self.updateDayButton()
             Haptic.selection()
         }
         picker.modalPresentationStyle = .pageSheet

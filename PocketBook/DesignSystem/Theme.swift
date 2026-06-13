@@ -9,10 +9,12 @@ enum Theme {
         static let point     = UIColor(hex: "#4A7AFF")
         static let pointSoft = UIColor(hex: "#4A7AFF").withAlphaComponent(0.12)
 
-        static let background = UIColor.systemBackground
+        static let background = UIColor { $0.userInterfaceStyle == .dark
+            ? UIColor(hex: "#0F1115") : UIColor(hex: "#F1F3F5") }   // 카드(흰색)와 구분되는 회색 캔버스
         static let card       = UIColor { $0.userInterfaceStyle == .dark
                                   ? UIColor(hex: "#1C1C1E") : .white }
-        static let groupedBG  = UIColor.systemGroupedBackground
+        static let groupedBG  = UIColor { $0.userInterfaceStyle == .dark
+            ? UIColor(hex: "#2A2D34") : UIColor(hex: "#F2F4F6") }
 
         static let mainText     = UIColor.label
         static let subText      = UIColor.secondaryLabel

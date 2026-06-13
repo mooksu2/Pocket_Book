@@ -25,6 +25,12 @@ final class SettingsViewController: UIViewController {
     private let syncSwitch = UISwitch()
     private let notifySwitch = UISwitch()
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 설정은 타이틀을 쓰므로 네비바 노출 (다른 탭이 숨겼을 수 있어 명시적으로 복원)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background

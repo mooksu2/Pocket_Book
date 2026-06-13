@@ -7,6 +7,7 @@ import UIKit
 final class DonutChartView: UIView {
 
     private var segmentLayers: [CAShapeLayer] = []
+    private var gradientLayers: [CAGradientLayer] = []
     private let trackLayer = CAShapeLayer()
 
     private let centerTitle: UILabel = {
@@ -72,6 +73,8 @@ final class DonutChartView: UIView {
     private func drawDonut(totals: [Category: Int], total: Int) {
         segmentLayers.forEach { $0.removeFromSuperlayer() }
         segmentLayers.removeAll()
+        gradientLayers.forEach { $0.removeFromSuperlayer() }
+        gradientLayers.removeAll()
         trackLayer.removeFromSuperlayer()
 
         let radius = (min(bounds.width, bounds.height) - lineWidth) / 2
@@ -91,24 +94,38 @@ final class DonutChartView: UIView {
 
         var cursor = start
         var delay: CFTimeInterval = 0
+        // 조각 사이 흰 틈새 (각도). 조각이 2개 이상일 때만 적용
+        let segmentCount = Category.allCases.filter { (totals[$0] ?? 0) > 0 }.count
+        let gap: CGFloat = segmentCount > 1 ? (3.0 / radius) : 0   // 약 3px 틈
         for cat in Category.allCases {
             let amount = totals[cat] ?? 0
             guard amount > 0 else { continue }
             let fraction = CGFloat(amount) / CGFloat(total)
             let end = cursor + fraction * 2 * .pi
 
+            // 양 끝을 gap의 절반씩 안으로 좁혀 조각 사이에 배경이 비치게
+            let arcLen = end - cursor
+            let g = arcLen > gap * 1.5 ? gap : 0
             let path = UIBezierPath(arcCenter: center, radius: radius,
-                                    startAngle: cursor, endAngle: end, clockwise: true)
-            let seg = CAShapeLayer()
-            seg.path = path.cgPath
-            seg.strokeColor = cat.color.cgColor
-            seg.fillColor = UIColor.clear.cgColor
-            seg.lineWidth = lineWidth
-            seg.lineCap = .round
-            layer.addSublayer(seg)
-            segmentLayers.append(seg)
+                                    startAngle: cursor + g / 2, endAngle: end - g / 2, clockwise: true)
+            let mask = CAShapeLayer()
+            mask.path = path.cgPath
+            mask.strokeColor = UIColor.black.cgColor
+            mask.fillColor = UIColor.clear.cgColor
+            mask.lineWidth = lineWidth
+            mask.lineCap = .butt   // round는 작은 조각을 뭉개므로 평평하게
 
-            // 순차 채움 애니메이션
+            let grad = CAGradientLayer()
+            grad.frame = bounds
+            grad.colors = cat.gradient.map { $0.cgColor }
+            grad.startPoint = CGPoint(x: 0.5, y: 0)
+            grad.endPoint = CGPoint(x: 0.5, y: 1)
+            grad.mask = mask
+            layer.addSublayer(grad)
+            segmentLayers.append(mask)
+            gradientLayers.append(grad)
+
+            // 순차 채움 애니메이션 (마스크의 strokeEnd)
             let anim = CABasicAnimation(keyPath: "strokeEnd")
             anim.fromValue = 0
             anim.toValue = 1
@@ -116,7 +133,7 @@ final class DonutChartView: UIView {
             anim.beginTime = CACurrentMediaTime() + delay
             anim.timingFunction = CAMediaTimingFunction(name: .easeOut)
             anim.fillMode = .backwards
-            seg.add(anim, forKey: "fill")
+            mask.add(anim, forKey: "fill")
 
             cursor = end
             delay += 0.18

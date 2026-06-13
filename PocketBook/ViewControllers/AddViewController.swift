@@ -13,6 +13,13 @@ final class AddViewController: UIViewController {
     /// 카테고리별 태그·고정여부 임시 캐시 — 칩 전환 시 입력 유지
     private var tagCache: [Category: (tags: [String], isFixed: Bool)] = [:]
     private let tagPicker = TagPickerView()
+    /// 고정지출 토글 (옵션 카드에 배치) — 태그 뷰에서 분리
+    private let fixedSwitch: UISwitch = {
+        let sw = UISwitch()
+        sw.onTintColor = Theme.Color.point
+        sw.translatesAutoresizingMaskIntoConstraints = false
+        return sw
+    }()
     
     // MARK: UI
     /// 금액 입력 블록 (₩라벨 + 키패드 + 퀵버튼) — 고정지출 등록 화면과 공유
@@ -27,13 +34,23 @@ final class AddViewController: UIViewController {
         tf.translatesAutoresizingMaskIntoConstraints = false
         return tf
     }()
-    private let datePicker: UIDatePicker = {
-        let dp = UIDatePicker()
-        dp.datePickerMode = .date
-        dp.preferredDatePickerStyle = .compact
-        dp.locale = Locale(identifier: "ko_KR")
-        dp.translatesAutoresizingMaskIntoConstraints = false
-        return dp
+    private var selectedDate = Date()
+    /// 날짜 행에 표시되는 "2026. 6. 13. ›" 버튼 (탭 → 날짜 시트)
+    private lazy var dateButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.baseForegroundColor = Theme.Color.mainText
+        config.image = UIImage(systemName: "chevron.right",
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+        config.imagePlacement = .trailing
+        config.imagePadding = 6
+        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 4)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.body(15); return a
+        }
+        let b = UIButton(configuration: config)
+        b.tintColor = Theme.Color.tertiaryText
+        b.translatesAutoresizingMaskIntoConstraints = false
+        return b
     }()
 
     private lazy var saveButton: UIButton = {
@@ -67,17 +84,16 @@ final class AddViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
-        title = editingExpense == nil ? "지출 입력" : "지출 수정"
+        title = editingExpense == nil ? "지출 등록" : "지출 수정"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .close, target: self, action: #selector(close))
 
         buildLayout()
         tagPicker.configure(for: selectedCategory)
-        tagPicker.onChanged = { [weak self] tags, fixed in
+        tagPicker.onChanged = { [weak self] tags, _ in
             guard let self else { return }
             self.selectedTags = tags
-            self.isFixed = fixed
-            self.tagCache[self.selectedCategory] = (tags, fixed)   // 캐시 동기화
+            self.tagCache[self.selectedCategory] = (tags, self.isFixed)   // 캐시 동기화
         }
         amountInput.onChanged = { [weak self] amount in
             // 버튼은 항상 누를 수 있게 두고, 빈 금액이면 alpha로만 비활성 느낌
@@ -101,7 +117,7 @@ final class AddViewController: UIViewController {
 
     // MARK: Layout
     private func buildLayout() {
-        // 카테고리 칩 4개
+        // 카테고리 타일 4개
         let chipRow = UIStackView()
         chipRow.axis = .horizontal
         chipRow.distribution = .fillEqually
@@ -115,19 +131,44 @@ final class AddViewController: UIViewController {
             chipRow.addArrangedSubview(chip)
         }
 
-        let memoSection = labeledCard("메모", memoField)
-        let dateSection = labeledCard("날짜", datePicker)
+        // 1) 금액 히어로 — 카드 없이 회색 배경에 직접 (목업 A안)
+        amountInput.caption = "얼마를 쓰셨나요?"
 
-        let stack = UIStackView(arrangedSubviews: [
-            makeFieldLabel("카테고리"), chipRow,
-            makeFieldLabel("태그"), tagPicker,
-            spacer(8), amountInput,
-            spacer(8), memoSection, dateSection,
-        ])
+        // 2) 카테고리 카드
+        let catCard = card()
+        let catStack = UIStackView(arrangedSubviews: [makeFieldLabel("카테고리"), chipRow])
+        catStack.axis = .vertical; catStack.spacing = Theme.Space.sm
+        embed(catStack, in: catCard)
+
+        // 3) 태그 카드 (고정지출 토글은 옵션 카드로 분리하므로 여기선 숨김)
+        tagPicker.setFixedToggleHidden(true)
+        let tagCard = card()
+        let tagStack = UIStackView(arrangedSubviews: [makeFieldLabel("태그"), tagPicker])
+        tagStack.axis = .vertical; tagStack.spacing = Theme.Space.sm
+        embed(tagStack, in: tagCard)
+
+        // 4) 옵션 카드 — 날짜 / 메모 / 고정지출 (행 형태)
+        let optionCard = card()
+        fixedSwitch.addTarget(self, action: #selector(fixedSwitchChanged), for: .valueChanged)
+        dateButton.addTarget(self, action: #selector(dateTapped), for: .touchUpInside)
+        dateButton.addTarget(self, action: #selector(dateButtonDown), for: [.touchDown, .touchDragEnter])
+        dateButton.addTarget(self, action: #selector(dateButtonUp), for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+        updateDateButton()
+        let dateRow = optionRow("날짜", dateButton)
+        memoField.textAlignment = .right
+        let memoRow = optionRow("메모", memoField)
+        let fixedRow = optionRow("고정지출", fixedSwitch)
+        let optStack = UIStackView(arrangedSubviews: [dateRow, hairline(), memoRow, hairline(), fixedRow])
+        optStack.axis = .vertical; optStack.spacing = Theme.Space.md
+        embed(optStack, in: optionCard)
+
+        let stack = UIStackView(arrangedSubviews: [amountInput, catCard, tagCard, optionCard])
         stack.axis = .vertical
-        stack.spacing = Theme.Space.sm
-        stack.setCustomSpacing(Theme.Space.lg, after: chipRow)
+        stack.spacing = Theme.Space.md
+        stack.setCustomSpacing(Theme.Space.xl, after: amountInput)   // 히어로 아래 넉넉히
         stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.layoutMargins = UIEdgeInsets(top: Theme.Space.xl, left: 0, bottom: 0, right: 0)
 
         view.addSubview(scrollView)
         scrollView.addSubview(stack)
@@ -135,67 +176,94 @@ final class AddViewController: UIViewController {
         saveButton.addTarget(self, action: #selector(save), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            // 스크롤 영역은 항상 저장 버튼 위에서 끝난다 → 포커스된 필드가 버튼에 가려지지 않는다
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -Theme.Space.sm),
 
-            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.xl),
+            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.md),
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Theme.Space.lg),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Theme.Space.lg),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Space.md),
             stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
-            chipRow.heightAnchor.constraint(equalToConstant: 64),
 
             saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
-            // 키보드가 없으면 safe area 하단, 올라오면 키보드 위 — 시스템이 애니메이션까지 처리
             saveButton.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Theme.Space.md),
             saveButton.heightAnchor.constraint(equalToConstant: 54),
         ])
     }
 
     // MARK: Builders
+    /// 흰 카드 생성
+    private func card(padding: UIEdgeInsets = UIEdgeInsets(top: Theme.Space.lg, left: Theme.Space.lg,
+                                                           bottom: Theme.Space.lg, right: Theme.Space.lg)) -> UIView {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.card
+        v.layer.cornerRadius = Theme.Radius.lg
+        v.layer.cornerCurve = .continuous
+        v.translatesAutoresizingMaskIntoConstraints = false
+        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
+        v.layoutMargins = padding
+        return v
+    }
+    /// 카드 안에 콘텐츠를 layoutMargins 기준으로 채운다
+    private func embed(_ content: UIView, in card: UIView) {
+        content.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(content)
+        let m = card.layoutMarginsGuide
+        NSLayoutConstraint.activate([
+            content.topAnchor.constraint(equalTo: m.topAnchor),
+            content.leadingAnchor.constraint(equalTo: m.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: m.trailingAnchor),
+            content.bottomAnchor.constraint(equalTo: m.bottomAnchor),
+        ])
+    }
+    /// 좌측 라벨 + 우측 값 형태의 옵션 행
+    private func optionRow(_ title: String, _ control: UIView) -> UIView {
+        let label = UILabel()
+        label.text = title
+        label.font = Theme.Font.title(15)   // 볼드
+        label.textColor = Theme.Color.mainText
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        // 라벨과 컨트롤 사이 신축 스페이서 → 컨트롤이 항상 우측 끝
+        let spacer = UIView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let row = UIStackView(arrangedSubviews: [label, spacer, control])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = Theme.Space.md
+        return row
+    }
+    private func hairline() -> UIView {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.hairline
+        v.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return v
+    }
+
+    // MARK: Builders
     private func makeFieldLabel(_ t: String) -> UILabel {
         let l = UILabel(); l.text = t
-        l.font = Theme.Font.caption(13); l.textColor = Theme.Color.subText
+        l.font = Theme.Font.title(15); l.textColor = Theme.Color.mainText   // 볼드
         return l
-    }
-    private func spacer(_ h: CGFloat) -> UIView {
-        let v = UIView(); v.heightAnchor.constraint(equalToConstant: h).isActive = true; return v
-    }
-    /// 라벨 + 카드 배경에 감싼 콘텐츠 (메모·날짜 공통 스타일)
-    private func labeledCard(_ title: String, _ content: UIView) -> UIView {
-        let label = makeFieldLabel(title)
-
-        let bg = UIView()
-        bg.backgroundColor = Theme.Color.groupedBG
-        bg.roundCorners(Theme.Radius.sm)
-        bg.translatesAutoresizingMaskIntoConstraints = false
-        content.translatesAutoresizingMaskIntoConstraints = false
-        bg.addSubview(content)
-        NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: Theme.Space.md),
-            content.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -Theme.Space.md),
-            content.topAnchor.constraint(equalTo: bg.topAnchor, constant: 12),
-            content.bottomAnchor.constraint(equalTo: bg.bottomAnchor, constant: -12),
-        ])
-
-        let stack = UIStackView(arrangedSubviews: [label, bg])
-        stack.axis = .vertical
-        stack.spacing = 4
-        return stack
     }
     // MARK: Logic
     private func prefill(_ e: Expense) {
         selectedCategory = e.category
         amountInput.setAmount(e.amount)
         memoField.text = e.memo
-        datePicker.date = e.date
+        selectedDate = e.date
+        updateDateButton()
         chips.forEach { $0.isSelected = ($0.category == e.category) }
         selectedTags = e.tags
         isFixed = e.isFixed
+        fixedSwitch.isOn = e.isFixed
         tagPicker.configure(for: e.category, preselected: e.tags, isFixed: e.isFixed)    }
 
     @objc private func chipTapped(_ chip: CategoryChip) {
@@ -205,6 +273,7 @@ final class AddViewController: UIViewController {
         let cached = tagCache[selectedCategory]
         selectedTags = cached?.tags ?? []
         isFixed = cached?.isFixed ?? false
+        fixedSwitch.isOn = isFixed
         tagPicker.configure(for: selectedCategory, preselected: selectedTags, isFixed: isFixed)
         UIView.animate(withDuration: 0.2) {
             self.chips.forEach { $0.isSelected = ($0 === chip) }
@@ -240,7 +309,7 @@ final class AddViewController: UIViewController {
             target.category = selectedCategory
             target.amount   = amountInput.amount
             target.memo     = memo
-            target.date     = datePicker.date
+            target.date     = selectedDate
             target.tags     = selectedTags
             target.isFixed  = isFixed
             ExpenseStore.shared.saveChanges()
@@ -249,11 +318,46 @@ final class AddViewController: UIViewController {
                 category: selectedCategory,
                 amount: amountInput.amount,
                 memo: memo,
-                date: datePicker.date,
+                date: selectedDate,
                 tags: selectedTags,
                 isFixed: isFixed))
         }
         dismiss(animated: true) { [weak self] in self?.onSaved?() }
+    }
+
+    @objc private func fixedSwitchChanged() {
+        isFixed = fixedSwitch.isOn
+        tagCache[selectedCategory] = (selectedTags, isFixed)
+    }
+
+    /// 날짜 행 탭 → 휠 데이트피커 시트
+    @objc private func dateButtonDown() {
+        UIView.animate(withDuration: 0.1) { self.dateButton.alpha = 0.4 }
+    }
+    @objc private func dateButtonUp() {
+        UIView.animate(withDuration: 0.1) { self.dateButton.alpha = 1 }
+    }
+
+    @objc private func dateTapped() {
+        Haptic.selection()
+        view.endEditing(true)
+        let sheet = DatePickerSheet(date: selectedDate)
+        sheet.onPick = { [weak self] picked in
+            self?.selectedDate = picked
+            self?.updateDateButton()
+        }
+        if let s = sheet.sheetPresentationController {
+            s.detents = [.medium()]
+            s.prefersGrabberVisible = true
+        }
+        present(sheet, animated: true)
+    }
+
+    private func updateDateButton() {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "yyyy. M. d."
+        dateButton.configuration?.title = f.string(from: selectedDate)
     }
 
     @objc private func close() { dismiss(animated: true) }

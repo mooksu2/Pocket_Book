@@ -19,7 +19,9 @@ final class TagPickerView: UIView {
         scroll.showsHorizontalScrollIndicator = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
         pillStack.axis    = .horizontal
-        pillStack.spacing = 8
+        pillStack.spacing = 6
+        pillStack.distribution = .fill          // 각 칩은 자기 글자 수만큼만 (균등 분배 아님)
+        pillStack.alignment = .center
         pillStack.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(pillStack)
 
@@ -86,13 +88,17 @@ final class TagPickerView: UIView {
     private func addPill(_ tag: String) {
         var config = UIButton.Configuration.plain()
         config.title = tag
-        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.caption(13); return a
+            var a = $0; a.font = Theme.Font.title(13); return a   // 볼드
         }
         let b = UIButton(configuration: config)
-        b.layer.cornerRadius = 16
+        b.layer.cornerRadius = 17   // 높이 34의 절반 → 완전한 알약
         b.layer.cornerCurve  = .continuous
+        // 각 칩은 자기 콘텐츠 크기 유지 (다른 칩 길이에 끌려가 늘어나지 않게)
+        b.setContentHuggingPriority(.required, for: .horizontal)
+        b.setContentCompressionResistancePriority(.required, for: .horizontal)
+        b.heightAnchor.constraint(equalToConstant: 34).isActive = true
         b.addAction(UIAction { [weak self] _ in self?.toggle(tag, button: b) }, for: .touchUpInside)
         style(b, selected: selectedTags.contains(tag))
         pillStack.addArrangedSubview(b)
@@ -106,9 +112,10 @@ final class TagPickerView: UIView {
     }
 
     private func style(_ b: UIButton, selected: Bool) {
-        // 회색 필 = 선택지, 카테고리색 풀필 = 선택됨
+        // 선택: 카테고리색 풀필 / 비선택: 회색 필 (테두리 없음)
         b.backgroundColor = selected ? category.color : Theme.Color.groupedBG
         b.configuration?.baseForegroundColor = selected ? .white : Theme.Color.subText
+        b.layer.borderWidth = 0
     }
 
     @objc private func fixedToggled(_ sw: UISwitch) {

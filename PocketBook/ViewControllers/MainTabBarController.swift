@@ -38,7 +38,15 @@ final class MainTabBarController: UITabBarController {
                                            constant: -CurvedTabBar.barHeight),
         ])
         curvedBar.onSelect = { [weak self] index in
-            self?.selectedIndex = index
+            guard let self = self, index != self.selectedIndex else { return }
+            self.selectedIndex = index
+            // 새 탭 화면을 부드럽게 페이드인 (딱 끊기지 않게)
+            if let v = self.selectedViewController?.view {
+                v.alpha = 0
+                UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut]) {
+                    v.alpha = 1
+                }
+            }
         }
         curvedBar.select(0, animated: false, notify: false)
     }

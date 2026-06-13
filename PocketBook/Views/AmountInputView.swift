@@ -21,6 +21,9 @@ final class AmountInputView: UIView {
     /// 숫자 키패드 올리기
     func focus() { hiddenField.becomeFirstResponder() }
 
+    /// 키패드 내리기 + first responder 자격 반납 (모달 닫힘 후 포커스 자동복원 방지)
+    func resignFocus() { hiddenField.resignFirstResponder() }
+
     /// 빈 금액 저장 시도 피드백 — 라벨 좌우 흔들기
     func shake() {
         let anim = CAKeyframeAnimation(keyPath: "transform.translation.x")
@@ -32,11 +35,25 @@ final class AmountInputView: UIView {
     // MARK: UI
     private static let maxAmount = 999_999_999
 
+    /// 금액 위 안내 캡션 ("얼마를 쓰셨나요?" 등). 외부에서 설정
+    var caption: String? {
+        didSet { captionLabel.text = caption; captionLabel.isHidden = (caption == nil) }
+    }
+    private let captionLabel: UILabel = {
+        let l = UILabel()
+        l.font = Theme.Font.caption(13)
+        l.textColor = Theme.Color.tertiaryText
+        l.textAlignment = .center
+        l.isHidden = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
     private let amountLabel: UILabel = {
         let l = UILabel()
         l.text = "₩0"
         l.font = Theme.Font.money(48, .heavy)
-        l.textColor = Theme.Color.tertiaryText
+        l.textColor = Theme.Color.subText
         l.textAlignment = .center
         l.adjustsFontSizeToFitWidth = true
         l.minimumScaleFactor = 0.5
@@ -71,17 +88,24 @@ final class AmountInputView: UIView {
 
         [1000, 5000, 10000, 50000].forEach { quickRow.addArrangedSubview(makeQuickButton($0)) }
 
-        let stack = UIStackView(arrangedSubviews: [amountLabel, quickRow])
+        let stack = UIStackView(arrangedSubviews: [captionLabel, amountLabel])
         stack.axis = .vertical
         stack.spacing = Theme.Space.md
+        stack.setCustomSpacing(Theme.Space.xs, after: captionLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
+        addSubview(quickRow)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            // 퀵버튼 행은 가운데로 모으고 너비를 줄인다 (좌우 꽉 차지 않게)
+            quickRow.topAnchor.constraint(equalTo: stack.bottomAnchor, constant: Theme.Space.lg),
+            quickRow.centerXAnchor.constraint(equalTo: centerXAnchor),
+            quickRow.widthAnchor.constraint(equalTo: widthAnchor, multiplier: 0.82),
             quickRow.heightAnchor.constraint(equalToConstant: 38),
+            quickRow.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -109,19 +133,24 @@ final class AmountInputView: UIView {
 
     private func refresh() {
         amountLabel.text = amount.won
-        amountLabel.textColor = amount > 0 ? Theme.Color.mainText : Theme.Color.tertiaryText
+        amountLabel.textColor = amount > 0 ? Theme.Color.mainText : Theme.Color.subText
         onChanged?(amount)
     }
 
     private func makeQuickButton(_ amount: Int) -> UIButton {
         let b = UIButton(type: .system)
-        b.setTitle("+\(amount.grouped)", for: .normal)
-        b.titleLabel?.font = Theme.Font.caption(13)
+        b.setTitle("+\(Self.shortLabel(amount))", for: .normal)
+        b.titleLabel?.font = Theme.Font.title(14)   // 볼드
         b.setTitleColor(Theme.Color.point, for: .normal)
         b.backgroundColor = Theme.Color.pointSoft   // 파란 틴트 = 액션 (회색 필 = 입력 필드)
-        b.layer.cornerRadius = 8
+        b.layer.cornerRadius = 9
         b.layer.cornerCurve = .continuous
         b.addAction(UIAction { [weak self] _ in self?.bump(amount) }, for: .touchUpInside)
         return b
+    }
+    /// 1000→"1천", 5000→"5천", 10000→"1만", 50000→"5만"
+    private static func shortLabel(_ amount: Int) -> String {
+        if amount >= 10000 { return "\(amount / 10000)만" }
+        return "\(amount / 1000)천"
     }
 }

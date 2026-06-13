@@ -24,6 +24,7 @@
 		907E0CF32FD55E27007D5911 /* TagLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 907E0CF22FD55E27007D5911 /* TagLibrary.swift */; };
 		907E0CF52FD55E6B007D5911 /* TagPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 907E0CF42FD55E6B007D5911 /* TagPickerView.swift */; };
 		907E0CF72FD5773B007D5911 /* MonthPickerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 907E0CF62FD5773B007D5911 /* MonthPickerViewController.swift */; };
+		90A940872FDD8E76004775E5 /* Datepickersheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90A940862FDD8E76004775E5 /* Datepickersheet.swift */; };
 		90B7D39F2FD67704000D359B /* RecurringExpense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90B7D39E2FD67704000D359B /* RecurringExpense.swift */; };
 		90B7D3A12FD67716000D359B /* RecurringStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90B7D3A02FD67716000D359B /* RecurringStore.swift */; };
 		90B7D3A32FD67728000D359B /* RecurringListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90B7D3A22FD67728000D359B /* RecurringListViewController.swift */; };
@@ -71,6 +72,7 @@
 		907E0CF22FD55E27007D5911 /* TagLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagLibrary.swift; sourceTree = "<group>"; };
 		907E0CF42FD55E6B007D5911 /* TagPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagPickerView.swift; sourceTree = "<group>"; };
 		907E0CF62FD5773B007D5911 /* MonthPickerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthPickerViewController.swift; sourceTree = "<group>"; };
+		90A940862FDD8E76004775E5 /* Datepickersheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Datepickersheet.swift; sourceTree = "<group>"; };
 		90B7D39E2FD67704000D359B /* RecurringExpense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringExpense.swift; sourceTree = "<group>"; };
 		90B7D3A02FD67716000D359B /* RecurringStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringStore.swift; sourceTree = "<group>"; };
 		90B7D3A22FD67728000D359B /* RecurringListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringListViewController.swift; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 				90D12C182FD868DB00FEFD9E /* Toast.swift */,
 				90DAE6F72FDB282700860242 /* AmountInputView.swift */,
 				90E4DF782FDBBCED0081B9A1 /* CurvedTabBar.swift */,
+				90A940862FDD8E76004775E5 /* Datepickersheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -332,6 +335,7 @@
 				C8D5E9A2F9D6433EAE4053A9 /* StatsViewController.swift in Sources */,
 				9F2E5ED40D524B0E9DF7D10C /* SettingsViewController.swift in Sources */,
 				907E0CF72FD5773B007D5911 /* MonthPickerViewController.swift in Sources */,
+				90A940872FDD8E76004775E5 /* Datepickersheet.swift in Sources */,
 				90B7D3A32FD67728000D359B /* RecurringListViewController.swift in Sources */,
 				90C9B1682FD6062200E0BB31 /* SplashViewController.swift in Sources */,
 			);

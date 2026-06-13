@@ -10,11 +10,22 @@ final class ListViewController: UIViewController {
     private var categoryFilter: Category?
 
     // MARK: Header
-    private lazy var monthButton: UIButton = {
-        let b = UIButton(type: .system)
-        b.titleLabel?.font = Theme.Font.title(16)
-        b.tintColor = Theme.Color.mainText
-        b.setTitleColor(Theme.Color.mainText, for: .normal)
+    private let monthButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.baseForegroundColor = Theme.Color.mainText
+        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+            var a = $0; a.font = Theme.Font.title(16); return a
+        }
+        // 탭 가능함을 알리는 아래 화살표 + 살짝 눌리는 피드백
+        config.image = UIImage(systemName: "chevron.down",
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold))
+        config.imagePlacement = .trailing
+        config.imagePadding = 5
+        let b = UIButton(configuration: config)
+        b.configurationUpdateHandler = { btn in
+            btn.alpha = btn.isHighlighted ? 0.5 : 1
+        }
         return b
     }()
     private let prevButton = ListViewController.navButton("chevron.left")
@@ -22,7 +33,7 @@ final class ListViewController: UIViewController {
     
     private let todayButton: UIButton = {
         var config = UIButton.Configuration.plain()
-        config.title = "이번 달로 이동"
+        config.title = "오늘"
         config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
         config.baseForegroundColor = Theme.Color.point
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
@@ -47,7 +58,7 @@ final class ListViewController: UIViewController {
     
     private let totalLabel: AnimatedCountLabel = {
         let l = AnimatedCountLabel()
-        l.font = Theme.Font.display(44)
+        l.font = Theme.Font.display(36)
         l.textColor = Theme.Color.mainText
         l.textAlignment = .left
         l.adjustsFontSizeToFitWidth = true
@@ -91,10 +102,17 @@ final class ListViewController: UIViewController {
     private let filterBar = CategoryFilterBar()
 
     private let tableView: UITableView = {
-        let tv = UITableView(frame: .zero, style: .plain)
+        let tv = UITableView(frame: .zero, style: .insetGrouped)   // 날짜별 흰 카드
         tv.register(ExpenseCell.self, forCellReuseIdentifier: ExpenseCell.reuseID)
-        tv.separatorStyle = .none
+        tv.separatorStyle = .singleLine
+        tv.separatorColor = Theme.Color.hairline
+        tv.separatorInset = UIEdgeInsets(top: 0, left: 64, bottom: 0, right: 16)
         tv.backgroundColor = .clear
+        tv.sectionHeaderTopPadding = Theme.Space.xs
+        // insetGrouped 카드 좌우 인셋을 헤더 카드(Space.lg=16)에 맞춤 (기본값은 더 넓음)
+        tv.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: 0, leading: Theme.Space.lg, bottom: 0, trailing: Theme.Space.lg)
+        tv.preservesSuperviewLayoutMargins = false
         tv.rowHeight = UITableView.automaticDimension
         tv.estimatedRowHeight = 64
         tv.showsVerticalScrollIndicator = false
@@ -122,9 +140,57 @@ final class ListViewController: UIViewController {
     // MARK: 고정지출 진입 (Fixed-expense entry)
     private let fixedRow: UIControl = {
         let v = UIControl()
+        v.backgroundColor = .clear   // 헤더 카드 안에 들어가므로 투명
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+    private let fixedIcon: UIView = {
+        let v = UIView()
         v.backgroundColor = Theme.Color.pointSoft
-        v.layer.cornerRadius = Theme.Radius.sm
+        v.layer.cornerRadius = 12
         v.layer.cornerCurve = .continuous
+        v.translatesAutoresizingMaskIntoConstraints = false
+        let img = UIImageView(image: UIImage(systemName: "arrow.triangle.2.circlepath"))
+        img.tintColor = Theme.Color.point
+        img.contentMode = .center
+        img.preferredSymbolConfiguration = .init(pointSize: 15, weight: .semibold)
+        img.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(img)
+        NSLayoutConstraint.activate([
+            v.widthAnchor.constraint(equalToConstant: 38),
+            v.heightAnchor.constraint(equalToConstant: 38),
+            img.centerXAnchor.constraint(equalTo: v.centerXAnchor),
+            img.centerYAnchor.constraint(equalTo: v.centerYAnchor),
+        ])
+        return v
+    }()
+    private let fixedSubLabel: UILabel = {
+        let l = UILabel()
+        l.text = "매달 빠져나가는 돈"
+        l.font = Theme.Font.caption(12)
+        l.textColor = Theme.Color.tertiaryText
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+    /// 헤더 카드 + 인사이트/고정지출 구분선
+    private let headerCard: UIView = {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.card
+        v.layer.cornerRadius = Theme.Radius.lg
+        v.layer.cornerCurve = .continuous
+        v.translatesAutoresizingMaskIntoConstraints = false
+        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
+        return v
+    }()
+    private let insightDivider: UIView = {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.hairline
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+    private let fixedDivider: UIView = {
+        let v = UIView()
+        v.backgroundColor = Theme.Color.hairline
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -160,19 +226,28 @@ final class ListViewController: UIViewController {
     }()
 
     private static func navButton(_ symbol: String) -> UIButton {
-        let b = UIButton(type: .system)
-        b.setImage(UIImage(systemName: symbol,
-                           withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)), for: .normal)
-        b.tintColor = Theme.Color.point
+        var config = UIButton.Configuration.plain()
+        config.image = UIImage(systemName: symbol,
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
+        config.baseForegroundColor = Theme.Color.point
+        // 터치 영역 확대 — 화살표 판정이 빡빡하지 않게
+        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
+        let b = UIButton(configuration: config)
         return b
     }
 
     // MARK: Lifecycle
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 타이틀이 없으므로 네비바를 숨겨 콘텐츠를 위로 끌어올린다
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
         buildLayout()
-        title = "기록"
+        title = ""   // 콘텐츠로 식별 가능 → 공간 확보
         wireActions()
 
         filterBar.onSearchChanged = { [weak self] text in
@@ -215,33 +290,63 @@ final class ListViewController: UIViewController {
         ])
 
         insightView.addSubview(insightLabel)
+        fixedRow.addSubview(fixedIcon)
         fixedRow.addSubview(fixedTitleLabel)
+        fixedRow.addSubview(fixedSubLabel)
         fixedRow.addSubview(fixedAmountLabel)
         fixedRow.addSubview(fixedActionLabel)
         fixedRow.addSubview(fixedChevron)
         budgetView.translatesAutoresizingMaskIntoConstraints = false
-        let header = UIStackView(arrangedSubviews: [navRow, totalCaption, totalLabel, comparisonLabel, budgetView, insightView, fixedRow])
+
+        // 카드 안 콘텐츠: 요약 → 예산바 → (구분선) → 인사이트 → (구분선) → 고정지출
+        let cardStack = UIStackView(arrangedSubviews: [
+            totalCaption, totalLabel, comparisonLabel, budgetView,
+            insightDivider, insightView, fixedDivider, fixedRow,
+        ])
+        cardStack.axis = .vertical
+        cardStack.alignment = .fill
+        cardStack.spacing = Theme.Space.xs
+        cardStack.setCustomSpacing(Theme.Space.sm, after: totalLabel)
+        cardStack.setCustomSpacing(Theme.Space.lg, after: comparisonLabel)
+        cardStack.setCustomSpacing(Theme.Space.lg, after: budgetView)
+        cardStack.setCustomSpacing(Theme.Space.sm, after: insightDivider)
+        cardStack.setCustomSpacing(Theme.Space.sm, after: insightView)
+        cardStack.setCustomSpacing(Theme.Space.md, after: fixedDivider)
+        cardStack.translatesAutoresizingMaskIntoConstraints = false
+        cardStack.isLayoutMarginsRelativeArrangement = true
+        cardStack.layoutMargins = UIEdgeInsets(top: Theme.Space.lg, left: 20,
+                                               bottom: Theme.Space.md, right: 20)
+        headerCard.addSubview(cardStack)
+        NSLayoutConstraint.activate([
+            cardStack.topAnchor.constraint(equalTo: headerCard.topAnchor),
+            cardStack.leadingAnchor.constraint(equalTo: headerCard.leadingAnchor),
+            cardStack.trailingAnchor.constraint(equalTo: headerCard.trailingAnchor),
+            cardStack.bottomAnchor.constraint(equalTo: headerCard.bottomAnchor),
+        ])
+
+        // 전체 헤더: 월 내비(카드 밖) + 헤더 카드
+        let header = UIStackView(arrangedSubviews: [navRow, headerCard])
         header.axis = .vertical
         header.alignment = .fill
-        header.spacing = Theme.Space.xs
-        header.setCustomSpacing(Theme.Space.md, after: navRow)
-        header.setCustomSpacing(Theme.Space.sm, after: totalLabel)
-        header.setCustomSpacing(Theme.Space.lg, after: comparisonLabel)
-        header.setCustomSpacing(Theme.Space.lg, after: budgetView)
-        header.setCustomSpacing(Theme.Space.sm, after: insightView)
+        header.spacing = Theme.Space.md
         header.translatesAutoresizingMaskIntoConstraints = false
         header.isLayoutMarginsRelativeArrangement = true
-        header.layoutMargins = UIEdgeInsets(top: Theme.Space.md, left: Theme.Space.lg,
-                                            bottom: Theme.Space.md, right: Theme.Space.lg)
+        header.layoutMargins = UIEdgeInsets(top: Theme.Space.lg, left: Theme.Space.lg,
+                                            bottom: Theme.Space.sm, right: Theme.Space.lg)
 
-        view.addSubview(header)
-        view.addSubview(filterBar)
         view.addSubview(tableView)
+        view.addSubview(header)      // 테이블보다 위 — 스크롤되는 카드를 가린다
+        view.addSubview(filterBar)   // 테이블보다 위 z-order — 스크롤되는 카드를 가린다
         view.addSubview(emptyView)
         view.addSubview(addButton)
 
         tableView.dataSource = self
         tableView.delegate = self
+        // 스크롤 영역 상단 모서리를 둥글게 — 카드가 직각 경계에서 각지게 잘리지 않도록
+        tableView.layer.cornerRadius = Theme.Radius.lg
+        tableView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        tableView.layer.cornerCurve = .continuous
+        tableView.clipsToBounds = true
         tableView.translatesAutoresizingMaskIntoConstraints = false
         emptyView.translatesAutoresizingMaskIntoConstraints = false
         filterBar.translatesAutoresizingMaskIntoConstraints = false
@@ -251,35 +356,34 @@ final class ListViewController: UIViewController {
             header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            insightView.heightAnchor.constraint(equalToConstant: 22),
-            insightView.leadingAnchor.constraint(equalTo: header.layoutMarginsGuide.leadingAnchor),
-            insightView.trailingAnchor.constraint(equalTo: header.layoutMarginsGuide.trailingAnchor),
+            // 구분선 (카드 안쪽 너비 가득)
+            insightDivider.heightAnchor.constraint(equalToConstant: 1),
+            fixedDivider.heightAnchor.constraint(equalToConstant: 1),
+
+            insightView.heightAnchor.constraint(equalToConstant: 20),
             insightLabel.leadingAnchor.constraint(equalTo: insightView.leadingAnchor),
             insightLabel.trailingAnchor.constraint(equalTo: insightView.trailingAnchor),
             insightLabel.centerYAnchor.constraint(equalTo: insightView.centerYAnchor),
 
+            // 고정지출 행: 아이콘 + (타이틀/부제) + 금액 + chevron
             fixedRow.heightAnchor.constraint(equalToConstant: 44),
-            fixedRow.leadingAnchor.constraint(equalTo: header.layoutMarginsGuide.leadingAnchor),
-            fixedRow.trailingAnchor.constraint(equalTo: header.layoutMarginsGuide.trailingAnchor),
-            fixedTitleLabel.leadingAnchor.constraint(equalTo: fixedRow.leadingAnchor, constant: Theme.Space.md),
-            fixedTitleLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
-            fixedChevron.trailingAnchor.constraint(equalTo: fixedRow.trailingAnchor, constant: -Theme.Space.md),
+            fixedIcon.leadingAnchor.constraint(equalTo: fixedRow.leadingAnchor),
+            fixedIcon.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
+            fixedTitleLabel.leadingAnchor.constraint(equalTo: fixedIcon.trailingAnchor, constant: Theme.Space.md),
+            fixedTitleLabel.topAnchor.constraint(equalTo: fixedIcon.topAnchor, constant: 1),
+            fixedSubLabel.leadingAnchor.constraint(equalTo: fixedTitleLabel.leadingAnchor),
+            fixedSubLabel.topAnchor.constraint(equalTo: fixedTitleLabel.bottomAnchor, constant: 1),
+            fixedChevron.trailingAnchor.constraint(equalTo: fixedRow.trailingAnchor),
             fixedChevron.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
             fixedActionLabel.trailingAnchor.constraint(equalTo: fixedChevron.leadingAnchor, constant: -Theme.Space.xs),
             fixedActionLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
             fixedAmountLabel.trailingAnchor.constraint(equalTo: fixedActionLabel.leadingAnchor, constant: -Theme.Space.sm),
             fixedAmountLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
 
-            // 큰 금액이 화면을 넘지 않도록 폭 제한 → adjustsFontSizeToFitWidth 동작
-            totalLabel.widthAnchor.constraint(lessThanOrEqualTo: header.layoutMarginsGuide.widthAnchor),
-            totalCaption.widthAnchor.constraint(lessThanOrEqualTo: header.layoutMarginsGuide.widthAnchor),
+            // 큰 금액이 카드를 넘지 않도록
+            totalLabel.widthAnchor.constraint(lessThanOrEqualTo: headerCard.widthAnchor),
 
-            budgetView.leadingAnchor.constraint(equalTo: header.layoutMarginsGuide.leadingAnchor),
-            budgetView.trailingAnchor.constraint(equalTo: header.layoutMarginsGuide.trailingAnchor),
-
-            comparisonLabel.widthAnchor.constraint(lessThanOrEqualTo: header.layoutMarginsGuide.widthAnchor),
-
-            filterBar.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Theme.Space.xs),
+            filterBar.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Theme.Space.sm),
             filterBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             filterBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             filterBar.heightAnchor.constraint(equalToConstant: 40),
@@ -328,7 +432,7 @@ final class ListViewController: UIViewController {
         let total = ExpenseStore.shared.totalAmount(year: year, month: month)
         let insight = ExpenseStore.shared.insight(year: year, month: month)
 
-        monthButton.setTitle("\(year)년 \(month)월", for: .normal)
+        monthButton.configuration?.title = "\(year)년 \(month)월"
         updateTodayButton()
         totalLabel.setValue(total, animated: animatedTotal)
 
@@ -352,12 +456,12 @@ final class ListViewController: UIViewController {
         // 지난달 대비 비교
         configureComparison()
 
-        // 인사이트
+        // 인사이트 — 빈 달에도 문구를 넣어 구분선만 남는 것 방지
+        insightView.isHidden = false
         if insight.entryCount > 0 {
-            insightView.isHidden = false
             insightLabel.text = "💡 \(insight.headline) · 하루 평균 \(insight.dailyAverage.won)"
         } else {
-            insightView.isHidden = true
+            insightLabel.text = "💡 이번 달엔 아직 지출이 없어요"
         }
 
         // 검색·필터 적용 (리스트만, 상단 요약은 월 전체 기준 유지)
@@ -500,7 +604,9 @@ extension ListViewController: UITableViewDataSource, UITableViewDelegate {
         return header
     }
 
-    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 38 }
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat { 26 }
+    func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat { 8 }
+    func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? { UIView() }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         Haptic.light()

@@ -59,7 +59,11 @@ final class ExpenseCell: UITableViewCell {
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
-        backgroundColor = .clear
+        // insetGrouped 카드 표면을 card 토큰(흰색)으로 명시 + 헤더 카드와 같은 곡률
+        var bg = UIBackgroundConfiguration.listGroupedCell()
+        bg.backgroundColor = Theme.Color.card
+        bg.cornerRadius = Theme.Radius.lg   // 20 — 위쪽 헤더 카드와 동일
+        backgroundConfiguration = bg
         selectionStyle = .none
         setup()
     }
@@ -100,7 +104,7 @@ final class ExpenseCell: UITableViewCell {
             amountStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Theme.Space.lg),
             amountStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
 
-            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 68),
+            contentView.heightAnchor.constraint(greaterThanOrEqualToConstant: 74),
         ])
     }
 

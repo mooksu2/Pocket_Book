@@ -37,6 +37,7 @@ final class CategoryFilterBar: UIView {
     // MARK: 검색 상태
     private let searchContainer: UIView = {
         let v = UIView()
+        v.backgroundColor = Theme.Color.background   // 뒤 필터칩 가림
         v.isHidden = true
         v.alpha = 0
         v.translatesAutoresizingMaskIntoConstraints = false
@@ -44,9 +45,10 @@ final class CategoryFilterBar: UIView {
     }()
     private let fieldBg: UIView = {
         let v = UIView()
-        v.backgroundColor = Theme.Color.groupedBG
-        v.layer.cornerRadius = 10
+        v.backgroundColor = Theme.Color.card   // 흰색 — 회색 배경에서 떠 보이게
+        v.layer.cornerRadius = 16
         v.layer.cornerCurve = .continuous
+        Theme.applyCardShadow(to: v.layer, opacity: 0.06, radius: 6, y: 2)
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -70,6 +72,7 @@ final class CategoryFilterBar: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        backgroundColor = Theme.Color.background   // 위로 스크롤되는 카드를 가린다
         scroll.addSubview(stack)
 
         // 🔍 아이콘 (필드 내부 왼쪽)
@@ -179,8 +182,10 @@ final class CategoryFilterBar: UIView {
             var a = $0; a.font = Theme.Font.caption(13); return a
         }
         let b = UIButton(configuration: config)
-        b.layer.cornerRadius = 18
-        b.layer.cornerCurve = .continuous
+        b.layer.cornerRadius = 20
+        b.layer.cornerCurve = .circular
+        b.clipsToBounds = true
+        b.heightAnchor.constraint(equalToConstant: 34).isActive = true
         b.addAction(UIAction { [weak self] _ in self?.tap(cat) }, for: .touchUpInside)
         pills.append((cat, b))
         stack.addArrangedSubview(b)
@@ -195,8 +200,9 @@ final class CategoryFilterBar: UIView {
     private func refresh() {
         for (cat, b) in pills {
             let isOn = (cat == selected)
-            let tint = cat?.color ?? Theme.Color.point
-            b.backgroundColor = isOn ? tint : Theme.Color.groupedBG
+            // 선택 시 항상 포인트 블루 채움 (비선택은 회색 필, 테두리 없음)
+            // 선택 시 파란 채움, 비선택은 투명 (배경에 녹아드는 텍스트만)
+            b.backgroundColor = isOn ? Theme.Color.point : .clear
             b.configuration?.baseForegroundColor = isOn ? .white : Theme.Color.subText
         }
     }

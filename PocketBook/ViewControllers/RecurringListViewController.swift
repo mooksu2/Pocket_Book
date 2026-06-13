@@ -8,9 +8,21 @@ final class RecurringListViewController: UIViewController {
     // MARK: Summary header
     private let summaryCard: UIView = {
         let v = UIView()
-        v.backgroundColor = Theme.Color.pointSoft
+        // 불투명 회색 바탕 + 파란 틴트를 합성해 불투명하게 (뒤로 스크롤되는 카드가 비치지 않게)
+        v.backgroundColor = Theme.Color.background
         v.roundCorners(Theme.Radius.md)
         v.translatesAutoresizingMaskIntoConstraints = false
+        let tint = UIView()
+        tint.backgroundColor = Theme.Color.pointSoft
+        tint.roundCorners(Theme.Radius.md)
+        tint.translatesAutoresizingMaskIntoConstraints = false
+        v.addSubview(tint)
+        NSLayoutConstraint.activate([
+            tint.topAnchor.constraint(equalTo: v.topAnchor),
+            tint.bottomAnchor.constraint(equalTo: v.bottomAnchor),
+            tint.leadingAnchor.constraint(equalTo: v.leadingAnchor),
+            tint.trailingAnchor.constraint(equalTo: v.trailingAnchor),
+        ])
         return v
     }()
     private let summaryCaption: UILabel = {
@@ -53,10 +65,16 @@ final class RecurringListViewController: UIViewController {
     }()
 
     private let tableView: UITableView = {
-        let t = UITableView(frame: .zero, style: .plain)
-        t.separatorStyle = .none
+        let t = UITableView(frame: .zero, style: .insetGrouped)   // 흰 카드 리스트
+        t.separatorStyle = .singleLine
+        t.separatorColor = Theme.Color.hairline
+        t.separatorInset = UIEdgeInsets(top: 0, left: 66, bottom: 0, right: 16)
         t.backgroundColor = .clear
         t.rowHeight = 68
+        t.sectionHeaderTopPadding = 0
+        // insetGrouped 카드 좌우 인셋을 다른 화면(Space.lg=16)에 맞춤
+        t.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: Theme.Space.lg, bottom: 0, trailing: Theme.Space.lg)
+        t.preservesSuperviewLayoutMargins = false
         t.translatesAutoresizingMaskIntoConstraints = false
         return t
     }()
@@ -84,6 +102,11 @@ final class RecurringListViewController: UIViewController {
         buildLayout()
         tableView.dataSource = self
         tableView.delegate = self
+        // 스크롤 영역 상단 모서리를 둥글게 — 카드가 직각 경계에서 각지게 잘리지 않도록
+        tableView.layer.cornerRadius = Theme.Radius.lg
+        tableView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        tableView.layer.cornerCurve = .continuous
+        tableView.clipsToBounds = true
         tableView.register(RecurringCell.self, forCellReuseIdentifier: "rec")
 
         NotificationCenter.default.addObserver(self, selector: #selector(reload),
@@ -98,13 +121,13 @@ final class RecurringListViewController: UIViewController {
 
     // MARK: Layout
     private func buildLayout() {
-        view.addSubview(summaryCard)
+        view.addSubview(tableView)   // 요약 카드보다 아래 z-order
+        view.addSubview(summaryCard) // 테이블 위 — 스크롤되는 카드를 가린다
         summaryCard.addSubview(summaryCaption)
         summaryCard.addSubview(summaryTotal)
         summaryCard.addSubview(progressTrack)
         progressTrack.addSubview(progressFill)
         summaryCard.addSubview(splitLabel)
-        view.addSubview(tableView)
         view.addSubview(emptyLabel)
 
         progressFillWidth = progressFill.widthAnchor.constraint(equalToConstant: 0)
@@ -229,7 +252,10 @@ private final class RecurringCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         selectionStyle = .none
-        backgroundColor = .clear
+        var bg = UIBackgroundConfiguration.listGroupedCell()
+        bg.backgroundColor = Theme.Color.card
+        bg.cornerRadius = Theme.Radius.lg
+        backgroundConfiguration = bg
 
         iconWrap.translatesAutoresizingMaskIntoConstraints = false
         iconWrap.layer.cornerRadius = 10
