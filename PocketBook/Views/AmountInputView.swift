@@ -128,7 +128,9 @@ final class AmountInputView: UIView {
         refresh()
         // 살짝 커졌다 돌아오는 피드백
         amountLabel.transform = CGAffineTransform(scaleX: 1.06, y: 1.06)
-        UIView.animate(withDuration: 0.2) { self.amountLabel.transform = .identity }
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.5, options: .curveEaseInOut) {
+                    self.amountLabel.transform = .identity
+                }
     }
 
     private func refresh() {

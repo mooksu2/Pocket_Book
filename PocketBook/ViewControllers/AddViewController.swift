@@ -264,7 +264,10 @@ final class AddViewController: UIViewController {
         selectedTags = e.tags
         isFixed = e.isFixed
         fixedSwitch.isOn = e.isFixed
-        tagPicker.configure(for: e.category, preselected: e.tags, isFixed: e.isFixed)    }
+        tagPicker.configure(for: e.category, preselected: e.tags, isFixed: e.isFixed)
+        
+        tagCache[e.category] = (e.tags, e.isFixed)
+    }
 
     @objc private func chipTapped(_ chip: CategoryChip) {
         Haptic.selection()
