@@ -1,65 +1,273 @@
+<div align="center">
+
+<img src="docs/screenshots/app_icon.png" width="110" alt="PocketBook 앱 아이콘">
+
 # PocketBook 💸
 
-빠르게 기록하는 일상 가계부 — iOS · Swift · UIKit
+**빠르게 기록하는 일상 가계부 — iOS · Swift · UIKit · SwiftData**
 
-> 카테고리 선택 → 금액 입력 → 저장. 하루 평균 30초 안에 끝나는 지출 기록.
+> 카테고리 한 번 탭 → 금액 입력 → 저장. 하루 평균 **30초** 안에 끝나는 지출 기록.
+
+![Platform](https://img.shields.io/badge/iOS-17.0+-000000?logo=apple&logoColor=white)
+![Swift](https://img.shields.io/badge/Swift-5-FA7343?logo=swift&logoColor=white)
+![UIKit](https://img.shields.io/badge/UIKit-Programmatic-2396F3?logo=swift&logoColor=white)
+![SwiftData](https://img.shields.io/badge/SwiftData-Persistence-blue)
+![Dependencies](https://img.shields.io/badge/dependencies-0-success)
+
+</div>
+
+<!-- =========================================================
+     📸 메인 갤러리  (docs/screenshots/ 에 아래 4장 넣기)
+     권장 사이즈: iPhone 15 스크린샷 그대로 (1179×2556)
+========================================================= -->
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/list.png" width="220" alt="기록 탭"><br><b>기록</b></td>
+    <td align="center"><img src="docs/screenshots/calendar.png" width="220" alt="캘린더 탭"><br><b>캘린더</b></td>
+    <td align="center"><img src="docs/screenshots/stats.png" width="220" alt="통계 탭"><br><b>통계</b></td>
+    <td align="center"><img src="docs/screenshots/recurring.png" width="220" alt="고정지출"><br><b>고정지출</b></td>
+  </tr>
+</table>
+</div>
 
 ---
 
-## 핵심 가치
+## 목차
 
-기록의 **마찰을 줄이는 것** 하나에 집중합니다. 앱을 켜고 `+` → 카테고리 칩 한 번 탭 → 금액 입력 → 저장이면 끝입니다.
+- [소개](#-소개)
+- [주요 기능](#-주요-기능)
+- [스크린샷](#-스크린샷)
+- [기술 스택](#-기술-스택)
+- [아키텍처](#-아키텍처)
+- [구현 하이라이트](#-구현-하이라이트)
+- [프로젝트 구조](#-프로젝트-구조)
+- [시작하기](#-시작하기)
+- [시연 영상](#-시연-영상)
 
-## 구현 범위 (계획서 대비)
+---
 
-| 우선순위 | 기능 | 상태 |
-|---|---|---|
-| **P0** | 지출 입력·저장 | ✅ |
-| **P0** | 지출 리스트 조회 (날짜별 그룹·일일 합계) | ✅ |
-| **P0** | 월별 합계 (카운트업 애니메이션) | ✅ |
-| **P1** | 카테고리별 통계 차트 (도넛 + 막대) | ✅ |
-| **P2** | 지출 수정·삭제 (스와이프·확인 다이얼로그) | ✅ |
-| **P3** | **예산 설정·초과 알림** (`UNUserNotificationCenter`) | ✅ |
-| **P3** | **iCloud 동기화** (`NSUbiquitousKeyValueStore`) | ✅ |
-| 확장 | 다크 모드 | ✅ |
+## 📖 소개
 
-## 아키텍처 — 3계층
+PocketBook은 **기록의 마찰을 줄이는 것** 하나에 집중한 개인 가계부 앱입니다.
+앱을 켜고 `+` → 카테고리 칩 한 번 탭 → 금액 입력 → 저장이면 끝. 매달 빠져나가는 월세·구독료는 **고정지출**로 등록해두면 결제일마다 자동으로 기록됩니다.
+
+- 🎯 **빠른 입력** — 큰 금액 키패드 + 빠른 금액 버튼, 1-탭 카테고리 칩
+- 🔄 **고정지출 자동화** — 결제일이 지나면 알아서 기록 (중복 없이)
+- 📅 **캘린더 · 📊 통계** — 하루 단위부터 카테고리·태그별 분석까지
+- 💰 **예산 알림** — 80% · 100% 도달 시 로컬 알림
+- 🌙 **다크 모드** · 햅틱 · 부드러운 애니메이션
+- 📦 **외부 라이브러리 0** — 차트·탭바 전부 Core Graphics / Core Animation 직접 구현
+
+---
+
+## ✨ 주요 기능
+
+### 1. 빠른 지출 기록
+큰 `₩` 라벨을 탭하면 숫자 키패드가 올라오고, `+1천 / +5천 / +1만 / +5만` 버튼으로 더 빠르게 입력합니다.
+식비·교통·문화·기타 **카테고리 칩**을 한 번 탭하고, 자주 쓴 순으로 정렬되는 **태그**를 골라 저장합니다. 금액 없이 저장하면 **흔들림 피드백**으로 막아줍니다.
+
+<!-- 📸 docs/screenshots/add.png  (지출 등록 화면) -->
+<div align="center"><img src="docs/screenshots/add.png" width="260" alt="지출 등록 화면"></div>
+
+### 2. 고정지출 자동 관리
+월세·넷플릭스처럼 매달 반복되는 지출을 **규칙**으로 등록하면, 결제일이 지날 때 자동으로 기록됩니다.
+
+- 앱 실행 / 백그라운드 복귀 / 자정 경과 시점에 **결제일이 지난 항목만** 자동 생성
+- **중복 방지(멱등)** — 같은 달에 두 번 기록되지 않음
+- 자동 생성분을 삭제하면 "이번 달만 건너뛰기"로 처리하고, **되돌리기**도 지원
+- **일시정지 / 재개**, 이번 달 `기록됨 / 예정` 금액 분리 표시
+
+<!-- 📸 docs/screenshots/recurring_edit.png  (고정지출 등록/허브) -->
+<div align="center"><img src="docs/screenshots/recurring_edit.png" width="260" alt="고정지출 등록 화면"></div>
+
+### 3. 캘린더
+한 달을 그리드로 보고, 지출이 있는 날엔 **일별 합계**가 표시됩니다. 날짜를 탭하면 그날의 내역이 아래에 펼쳐집니다.
+
+### 4. 통계 & 인사이트
+**도넛 ↔ 막대** 차트를 토글하고, 카테고리별 내역을 탭하면 **태그별 상세**가 펼쳐집니다.
+
+- `고정지출 제외` 필터로 변동지출만 분석
+- **지난달 대비 증감**(▲/▼ %)과 **하루 평균** 인사이트
+- 카테고리별 색·비중 범례
+
+<!-- 📸 docs/screenshots/stats_bar.png  (막대 차트 모드) -->
+<div align="center"><img src="docs/screenshots/stats_bar.png" width="260" alt="통계 막대 차트"></div>
+
+### 5. 예산 & 알림
+월 예산을 정하면 메인 화면에 **진행바**(안전·주의·초과 색상)가 뜨고, **80% · 100%** 도달 시 단계별로 한 번씩 로컬 알림을 보냅니다.
+
+### 6. 디테일
+- **스와이프 삭제 + 되돌리기** — 실수해도 토스트의 `되돌리기`로 즉시 복구 (연속 삭제는 묶어서 한 번에)
+- **다크 모드** 완전 대응
+- **햅틱 피드백** & 카운트업 / 막대 성장 / 도넛 채움 애니메이션
+- **커스텀 곡선 탭바**
+
+---
+
+## 📸 스크린샷
+
+<!-- =========================================================
+     라이트 / 다크 모드 비교 (docs/screenshots/ 에 넣기)
+========================================================= -->
+| 라이트 모드 | 다크 모드 |
+|:---:|:---:|
+| <img src="docs/screenshots/light.png" width="240" alt="라이트 모드"> | <img src="docs/screenshots/dark.png" width="240" alt="다크 모드"> |
+
+<!-- 그 외 보여주고 싶은 화면이 있으면 아래에 추가
+| 설정 | 검색·필터 |
+|:---:|:---:|
+| <img src="docs/screenshots/settings.png" width="240"> | <img src="docs/screenshots/search.png" width="240"> |
+-->
+
+> 📁 스크린샷은 `docs/screenshots/` 폴더에 넣고 위 파일명과 맞춰주세요.
+
+---
+
+## 🛠 기술 스택
+
+| 분류 | 사용 기술 |
+|---|---|
+| **언어** | Swift 5 |
+| **UI** | UIKit (100% 프로그래매틱 Auto Layout, Storyboard 미사용) |
+| **영속성** | SwiftData (`@Model`, `ModelContainer` / `ModelContext`) + `UserDefaults`(설정·예산·태그 빈도) |
+| **그래픽** | Core Graphics · Core Animation (`CAShapeLayer`, `CAGradientLayer`, `CADisplayLink`) |
+| **시스템** | `UNUserNotifications`(예산 알림), `UISheetPresentationController`(하프 시트) |
+| **의존성** | **없음** (서드파티 라이브러리 0) |
+| **개발 환경** | Xcode 15.4 · macOS Sonoma · iPhone 15 |
+
+---
+
+## 🏗 아키텍처
 
 ```
-Presentation   ViewControllers · Views · DesignSystem
-     │  (NotificationCenter)
-Business Logic ExpenseStore · SettingsStore · Services
-     │  (Codable + JSONEncoder)
-Persistence    UserDefaults  ·  NSUbiquitousKeyValueStore (iCloud)
+┌──────────────────────────────────────────────────────┐
+│  Presentation   ViewControllers · Views · DesignSystem │
+│        │  NotificationCenter (변경 통보)                 │
+│  Domain/State   ExpenseStore · RecurringStore ·         │
+│        │        SettingsStore   (@MainActor 싱글톤)       │
+│        │  ModelContext                                   │
+│  Persistence    SwiftData (@Model)  ·  UserDefaults      │
+└──────────────────────────────────────────────────────┘
 ```
 
-- **모델**: `Expense`(struct) + `Category`(enum), 둘 다 `Codable`.
-- **저장**: `ExpenseStore`가 배열을 `JSONEncoder`로 인코딩 → `UserDefaults`에 저장, 앱 시작 시 `JSONDecoder`로 복원. 디코딩 실패 시 빈 배열로 폴백.
-- **변경 통보**: `NotificationCenter`로 화면 자동 갱신.
-- **외부 라이브러리 의존성 0** — 차트는 전부 Core Graphics / Core Animation으로 직접 구현.
+**데이터 모델 (SwiftData)**
+- `Expense` — 개별 지출. `@Attribute(.unique) id`, `@Transient category`(enum ↔ rawValue 변환), 고정지출 연결용 `recurringID`.
+- `RecurringExpense` — 매월 반복 '규칙'. 결제일(`dayOfMonth`), 건너뛴 달 원장(`skippedMonths`), 말일 보정 로직 내장.
+- `PocketBookContainer` — `ModelContainer`를 단일 소유, 모든 스토어가 공유.
 
-## 화면
+**상태 관리**
+- `ExpenseStore` / `RecurringStore` / `SettingsStore` — `@MainActor` 싱글톤. `ModelContext`로 CRUD하고 변경 시 `NotificationCenter`로 브로드캐스트(`expensesDidChange` · `recurringDidChange` · `settingsDidChange`) → 각 화면 자동 갱신.
 
-- **기록 탭** — 이번 달 총액(카운트업) · 예산 진행바 · "가장 많이 쓴 카테고리 + 하루 평균" 인사이트 · 날짜별 섹션 리스트 · 플로팅 `+` 버튼.
-- **입력 모달** — 카테고리 칩 4개 · 큰 금액 표시 · 빠른 금액 버튼(+1천/5천/1만/5만) · 실시간 콤마 포맷 · 메모 · 날짜.
-- **통계 탭** — 도넛/막대 토글 차트(애니메이션) · 카테고리별 내역 리스트.
-- **설정 탭** — 월 예산 · iCloud 동기화 · 예산 초과 알림.
+**디자인 시스템**
+- `Theme` — 컬러(다크 모드 대응), 스페이싱, 라운드, 타이포(금액은 monospaced digit), 그림자 토큰.
+- 공용 컴포넌트 — `CardView`, `MonthNavigatorView`, `CardFormViewController`, `AmountInputView`, `Toast`, `Haptic`.
 
-## 빌드 방법
+> ℹ️ iCloud(CloudKit) 동기화는 컨테이너 구조만 마련되어 있고, 유료 개발자 계정이 필요해 현재 비활성 상태입니다.
 
-1. **Xcode 12.5 이상**으로 `PocketBook.xcodeproj` 열기 (Deployment Target iOS 14.0, 프로젝트 포맷 objectVersion 50).
-2. 시뮬레이터 선택 후 ⌘R — 데모 데이터가 채워진 상태로 바로 실행됩니다. 별도 설정/권한 세팅 없이 즉시 빌드됩니다.
+---
 
-> **iCloud 동기화**를 실제로 기기 간 동작시키려면 앱 타깃 **Signing & Capabilities** 에서 **iCloud → Key-value storage** capability만 추가하면 됩니다. 미설정 시 코드는 안전하게 로컬 저장으로 폴백하므로 앱은 그대로 정상 동작합니다. (예산·알림은 추가 설정 없이 바로 사용 가능)
+## 💡 구현 하이라이트
 
-## 예외 처리
+- **고정지출 자동 생성(Materialization)** — 결제일이 지난 규칙을 **멱등하게 1회만** `Expense`로 구체화. 사용자가 자동 생성분을 삭제하면 `skippedMonths`에 기록해 재생성을 막고, 되돌리면 해제. "껐다 켜도 두 번 안 생기는" 정합성을 보장.
+- **파괴적 액션 일관성** — 기록·캘린더 어느 화면에서 지우든 **동일한 되돌리기 UX** (공용 `UIViewController` 확장). 연속 삭제는 `UndoCenter`가 한 토스트로 묶어 이전 되돌리기가 사라지지 않게 처리.
+- **순수 Core Graphics 차트** — 도넛은 `CAShapeLayer` stroke를 순차 애니메이션, 막대는 `draw(_:)` + `CADisplayLink` progress로 자라남. 외부 차트 라이브러리 0.
+- **커스텀 곡선 탭바** — `UIBezierPath`로 그린 `CAShapeLayer` 배경 + 선택 시 바운스 애니메이션.
+- **성능 · 안정성** — `DateFormatter` 캐싱(셀 스크롤 최적화), `CADisplayLink` 약한 프록시로 retain cycle 차단, `shadowPath` 지정으로 그림자 렌더 비용 제거, iOS 17 `registerForTraitChanges`로 다크 모드 색상 갱신.
+- **모듈화** — 세 탭이 공유하던 월 네비게이션, 두 입력 폼의 공통 골격을 재사용 컴포넌트로 추출해 중복 제거.
 
-- 금액 0원 → 저장 버튼 비활성화
-- 음수 → 숫자 키패드로 원천 차단
-- 9자리 초과 → 입력 무시
-- 삭제 → 확인 다이얼로그
-- 저장 데이터 손상 → 빈 배열 폴백 (강제 종료 방지)
+---
 
-## 기술 스택
+## 📂 프로젝트 구조
 
-`Swift 5` · `UIKit` · `Core Graphics` · `Core Animation` · `Codable` + `UserDefaults` · `NSUbiquitousKeyValueStore` · `UNUserNotificationCenter` · `NotificationCenter`
+```
+PocketBook/
+├── AppDelegate.swift
+├── Models/                  # SwiftData @Model
+│   ├── Expense.swift
+│   └── RecurringExpense.swift
+├── Store/                   # @MainActor 싱글톤 + 영속성
+│   ├── ExpenseStore.swift
+│   ├── RecurringStore.swift
+│   ├── SettingsStore.swift
+│   ├── PocketBookContainer.swift
+│   ├── Storage.swift
+│   └── TagLibrary.swift
+├── ViewControllers/
+│   ├── MainTabBarController.swift
+│   ├── ListViewController.swift          # 기록
+│   ├── CalendarViewController.swift      # 캘린더
+│   ├── StatsViewController.swift         # 통계
+│   ├── SettingsViewController.swift      # 설정
+│   ├── AddViewController.swift           # 지출 등록/수정
+│   ├── CardFormViewController.swift      # 입력 폼 공통 베이스
+│   ├── RecurringListViewController.swift # 고정지출 허브
+│   ├── RecurringEditViewController.swift # 고정지출 등록/수정
+│   ├── MonthPickerViewController.swift
+│   └── SplashViewController.swift
+├── Views/
+│   ├── CurvedTabBar.swift                # 커스텀 곡선 탭바
+│   ├── DonutChartView.swift / BarChartView.swift
+│   ├── AmountInputView.swift             # 금액 키패드 블록
+│   ├── MonthNavigatorView.swift          # 월 이동 헤더 (공용)
+│   ├── CardView.swift                    # 그림자 카드 (공용)
+│   ├── ExpenseCell.swift / CalendarDayCell.swift
+│   ├── Toast.swift / EmptyStateView.swift
+│   └── ...
+├── DesignSystem/
+│   └── Theme.swift                       # 컬러·타이포·스페이싱·햅틱 토큰
+├── Extensions/
+│   ├── Formatters.swift                  # 캐시된 포매터
+│   ├── UIViewController+Helpers.swift    # 삭제+되돌리기·presentOnce
+│   └── ...
+└── Services/
+    └── NotificationService.swift         # 예산 초과 로컬 알림
+```
+
+---
+
+## 🚀 시작하기
+
+**요구사항**
+- Xcode 15.4 이상
+- iOS 17.0 이상 (실기기 또는 시뮬레이터)
+
+**실행**
+```bash
+git clone https://github.com/mooksu2/Pocket_Book.git
+cd Pocket_Book
+open PocketBook.xcodeproj
+```
+1. Xcode에서 프로젝트를 엽니다.
+2. `Signing & Capabilities`에서 본인 **Team**을 선택합니다.
+3. 타깃 기기를 선택하고 `⌘R`로 실행합니다.
+
+> 알림(예산 초과) 기능을 테스트하려면 설정 화면에서 알림 권한을 허용하세요.
+
+---
+
+## 🎬 시연 영상
+
+<!-- =========================================================
+     ▶️ 아래 VIDEO_ID 를 본인 유튜브 영상 ID로 교체하세요.
+        예) https://youtu.be/AbCdEfGh123  →  VIDEO_ID = AbCdEfGh123
+     GitHub README는 동영상 직접 임베드(iframe)가 막혀 있어,
+     '썸네일 클릭 → 유튜브로 이동' 방식이 표준입니다.
+========================================================= -->
+<div align="center">
+
+[![PocketBook 시연 영상](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://youtu.be/VIDEO_ID)
+
+▶️ **이미지를 클릭하면 유튜브 시연 영상으로 이동합니다**
+
+</div>
+
+<!-- (선택) 직접 만든 썸네일을 쓰고 싶다면 위 대신 아래 형식 사용:
+[![PocketBook 시연 영상](docs/screenshots/video_thumbnail.png)](https://youtu.be/VIDEO_ID)
+-->
+
+---
+
+<div align="center">
+<sub>Made with ❤️ using UIKit & SwiftData · 외부 라이브러리 없이 직접 구현</sub>
+</div>
