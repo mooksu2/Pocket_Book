@@ -294,5 +294,5 @@ open PocketBook.xcodeproj
 ---
 
 <div align="center">
-<sub>Made with ❤️ using UIKit & SwiftData · 외부 라이브러리 없이 직접 구현</sub>
+<sub>Made with ❤️ using UIKit & SwiftData</sub>
 </div>
