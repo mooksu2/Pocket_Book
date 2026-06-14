@@ -16,10 +16,7 @@
 
 </div>
 
-<!-- =========================================================
-     📸 메인 갤러리  (docs/screenshots/ 에 아래 4장 넣기)
-     권장 사이즈: iPhone 15 스크린샷 그대로 (1179×2556)
-========================================================= -->
+
 <div align="center">
 <table>
   <tr>
@@ -120,7 +117,6 @@ PocketBook은 **기록의 마찰을 줄이는 것** 하나에 집중한 개인 �
 | <img src="docs/screenshots/settings.png" width="240"> | <img src="docs/screenshots/search.png" width="240"> |
 
 
-> 📁 스크린샷은 `docs/screenshots/` 폴더에 넣고 위 파일명과 맞춰주세요.
 
 ---
 
