@@ -114,11 +114,11 @@ PocketBook은 **기록의 마찰을 줄이는 것** 하나에 집중한 개인 �
 |:---:|:---:|
 | <img src="docs/screenshots/light.png" width="240" alt="라이트 모드"> | <img src="docs/screenshots/dark.png" width="240" alt="다크 모드"> |
 
-<!-- 그 외 보여주고 싶은 화면이 있으면 아래에 추가
+
 | 설정 | 검색·필터 |
 |:---:|:---:|
 | <img src="docs/screenshots/settings.png" width="240"> | <img src="docs/screenshots/search.png" width="240"> |
--->
+
 
 > 📁 스크린샷은 `docs/screenshots/` 폴더에 넣고 위 파일명과 맞춰주세요.
 
