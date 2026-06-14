@@ -76,10 +76,12 @@ PocketBook은 **기록의 마찰을 줄이는 것** 하나에 집중한 개인 �
 - **일시정지 / 재개**, 이번 달 `기록됨 / 예정` 금액 분리 표시
 
 <!-- 📸 docs/screenshots/recurring_edit.png  (고정지출 등록/허브) -->
-<div align="center"><img src="docs/screenshots/recurring_edit.png" width="260" alt="고정지출 등록 화면"></div>
+<div align="center"><img src="docs/screenshots/recurring_edit.png" width="260" alt="고정지출 등록 화면"> <align="center"><img src="docs/screenshots/recurring.png" width="260" alt="고정지출 등록 화면"></div>
 
 ### 3. 캘린더
 한 달을 그리드로 보고, 지출이 있는 날엔 **일별 합계**가 표시됩니다. 날짜를 탭하면 그날의 내역이 아래에 펼쳐집니다.
+
+<div align="center"><img src="docs/screenshots/calendar.png" width="260" alt="캘린더 화면"></div>
 
 ### 4. 통계 & 인사이트
 **도넛 ↔ 막대** 차트를 토글하고, 카테고리별 내역을 탭하면 **태그별 상세**가 펼쳐집니다.
