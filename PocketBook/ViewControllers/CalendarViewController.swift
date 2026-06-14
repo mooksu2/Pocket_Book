@@ -1,7 +1,7 @@
 // ViewControllers/CalendarViewController.swift
 import UIKit
 
-/// 달력으로 지출 내역 보기. 지출 있는 날은 점으로 표시, 날짜 탭 시 그 날 내역을 아래에 표시.
+/// 달력으로 지출 내역 보기. 지출 있는 날은 합계 금액 표시, 날짜 탭 시 그 날 내역을 아래에 표시.
 final class CalendarViewController: UIViewController {
 
     private var year = Date().year
@@ -16,41 +16,7 @@ final class CalendarViewController: UIViewController {
     private var dayExpenses: [Expense] = []
 
     // MARK: Header
-    private let monthButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.baseForegroundColor = Theme.Color.mainText
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.title(16); return a
-        }
-        // 탭 가능함을 알리는 아래 화살표 + 살짝 눌리는 피드백
-        config.image = UIImage(systemName: "chevron.down",
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold))
-        config.imagePlacement = .trailing
-        config.imagePadding = 5
-        let b = UIButton(configuration: config)
-        b.configurationUpdateHandler = { btn in
-            btn.alpha = btn.isHighlighted ? 0.5 : 1
-        }
-        return b
-    }()
-    private let prevButton = CalendarViewController.navButton("chevron.left")
-    private let nextButton = CalendarViewController.navButton("chevron.right")
-    private let todayButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.title = "오늘"
-        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
-        config.baseForegroundColor = Theme.Color.point
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.caption(12); return a
-        }
-        let b = UIButton(configuration: config)
-        b.backgroundColor = Theme.Color.pointSoft
-        b.layer.cornerRadius = 12
-        b.layer.cornerCurve = .continuous
-        b.translatesAutoresizingMaskIntoConstraints = false
-        return b
-    }()
+    private let monthNav = MonthNavigatorView()
 
     private let weekdayHeader: UIStackView = {
         let s = UIStackView()
@@ -93,8 +59,8 @@ final class CalendarViewController: UIViewController {
         tv.rowHeight = UITableView.automaticDimension
         tv.estimatedRowHeight = 64
         tv.showsVerticalScrollIndicator = false
-        tv.layer.cornerRadius = Theme.Radius.lg   // 카드 하단 모서리 밖으로 셀이 돌출되지 않게
-        tv.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]  // 아래 두 모서리만
+        tv.layer.cornerRadius = Theme.Radius.lg
+        tv.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
         tv.clipsToBounds = true
         tv.translatesAutoresizingMaskIntoConstraints = false
         return tv
@@ -109,32 +75,21 @@ final class CalendarViewController: UIViewController {
         return l
     }()
 
-    private static func navButton(_ symbol: String) -> UIButton {
-        var config = UIButton.Configuration.plain()
-        config.image = UIImage(systemName: symbol,
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
-        config.baseForegroundColor = Theme.Color.point
-        // 터치 영역 확대 — 화살표 판정이 빡빡하지 않게
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
-        let b = UIButton(configuration: config)
-        return b
-    }
-
     // MARK: Lifecycle
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 타이틀이 없으므로 네비바를 숨겨 콘텐츠를 위로 끌어올린다
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
-        title = ""   // 콘텐츠로 식별 가능 → 공간 확보
+        title = ""
         buildLayout()
-        prevButton.addTarget(self, action: #selector(prevMonth), for: .touchUpInside)
-        nextButton.addTarget(self, action: #selector(nextMonth), for: .touchUpInside)
-        todayButton.addTarget(self, action: #selector(jumpToToday), for: .touchUpInside)
+        monthNav.onPrev     = { [weak self] in self?.shift(-1) }
+        monthNav.onNext     = { [weak self] in self?.shift(+1) }
+        monthNav.onTapMonth = { [weak self] in self?.showMonthPicker() }
+        monthNav.onToday    = { [weak self] in self?.jumpToToday() }
         detailTable.dataSource = self
         detailTable.delegate = self
         NotificationCenter.default.addObserver(self, selector: #selector(reload),
@@ -143,50 +98,16 @@ final class CalendarViewController: UIViewController {
     }
 
     // MARK: 카드 컨테이너
-    private let calendarCard: UIView = {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.card
-        v.layer.cornerRadius = Theme.Radius.lg
-        v.layer.cornerCurve = .continuous
-        v.translatesAutoresizingMaskIntoConstraints = false
-        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
-        return v
-    }()
-    private let detailCard: UIView = {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.card
-        v.layer.cornerRadius = Theme.Radius.lg
-        v.layer.cornerCurve = .continuous
-        v.translatesAutoresizingMaskIntoConstraints = false
-        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
-        return v
-    }()
+    private let calendarCard = CardView()
+    private let detailCard = CardView()
     /// 상세 테이블 높이 — 내용(contentSize)에 맞춰 갱신, 화면 넘으면 스크롤
     private var detailTableHeight: NSLayoutConstraint!
 
     // MARK: Layout
     private func buildLayout() {
-        // 월 내비: 월 그룹은 정중앙, 오늘 버튼은 우측 (기록 탭과 동일)
-        let monthGroup = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton])
-        monthGroup.alignment = .center
-        monthGroup.spacing = Theme.Space.sm
-        monthGroup.translatesAutoresizingMaskIntoConstraints = false
+        monthNav.translatesAutoresizingMaskIntoConstraints = false
 
-        let navRow = UIView()
-        navRow.translatesAutoresizingMaskIntoConstraints = false
-        navRow.addSubview(monthGroup)
-        navRow.addSubview(todayButton)
-        NSLayoutConstraint.activate([
-            monthGroup.centerXAnchor.constraint(equalTo: navRow.centerXAnchor),
-            monthGroup.topAnchor.constraint(equalTo: navRow.topAnchor),
-            monthGroup.bottomAnchor.constraint(equalTo: navRow.bottomAnchor),
-            todayButton.trailingAnchor.constraint(equalTo: navRow.trailingAnchor, constant: -Theme.Space.lg),
-            todayButton.centerYAnchor.constraint(equalTo: navRow.centerYAnchor),
-        ])
-
-        // 월 라벨 탭 → 월 피커
-        monthButton.addTarget(self, action: #selector(showMonthPicker), for: .touchUpInside)
-
+        // 월 라벨 탭 → 월 피커 (monthNav 콜백에서 처리)
         let symbols = ["일", "월", "화", "수", "목", "금", "토"]
         for (i, s) in symbols.enumerated() {
             let l = UILabel()
@@ -202,8 +123,7 @@ final class CalendarViewController: UIViewController {
         detailHeader.addSubview(detailDateLabel)
         detailHeader.addSubview(detailTotalLabel)
 
-        // navRow는 카드 밖, 달력은 calendarCard 안, 상세는 detailCard 안
-        view.addSubview(navRow)
+        view.addSubview(monthNav)
         view.addSubview(calendarCard)
         view.addSubview(detailCard)
         calendarCard.addSubview(weekdayHeader)
@@ -213,12 +133,12 @@ final class CalendarViewController: UIViewController {
         detailCard.addSubview(emptyLabel)
 
         NSLayoutConstraint.activate([
-            navRow.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.lg),
-            navRow.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            navRow.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            monthNav.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.lg),
+            monthNav.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            monthNav.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
             // 달력 카드
-            calendarCard.topAnchor.constraint(equalTo: navRow.bottomAnchor, constant: Theme.Space.md),
+            calendarCard.topAnchor.constraint(equalTo: monthNav.bottomAnchor, constant: Theme.Space.md),
             calendarCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             calendarCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
 
@@ -231,7 +151,7 @@ final class CalendarViewController: UIViewController {
             calendarStack.trailingAnchor.constraint(equalTo: calendarCard.trailingAnchor, constant: -Theme.Space.md),
             calendarStack.bottomAnchor.constraint(equalTo: calendarCard.bottomAnchor, constant: -Theme.Space.lg),
 
-            // 상세 카드 — 높이는 내용(테이블)에 맞춤. 화면을 넘으면 카드 안에서 스크롤
+            // 상세 카드
             detailCard.topAnchor.constraint(equalTo: calendarCard.bottomAnchor, constant: Theme.Space.md),
             detailCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
             detailCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
@@ -257,9 +177,8 @@ final class CalendarViewController: UIViewController {
             emptyLabel.trailingAnchor.constraint(equalTo: detailCard.trailingAnchor),
         ])
 
-        // 테이블 높이를 내용에 맞춤 (화면 절반을 넘으면 그 선에서 멈추고 스크롤)
         detailTableHeight = detailTable.heightAnchor.constraint(equalToConstant: 200)
-        detailTableHeight.priority = .defaultHigh   // 카드 하단 lessThanOrEqual과 충돌 시 양보
+        detailTableHeight.priority = .defaultHigh
         detailTableHeight.isActive = true
     }
 
@@ -267,11 +186,9 @@ final class CalendarViewController: UIViewController {
     private func updateDetailTableHeight() {
         view.layoutIfNeeded()
         let contentH = detailTable.contentSize.height
-        // safeArea 하단(탭바는 additionalSafeAreaInsets로 이미 반영됨)까지를 최대로
         let safeBottom = view.safeAreaLayoutGuide.layoutFrame.maxY - Theme.Space.md
         let tableTop = detailTable.convert(CGPoint.zero, to: view).y
         let maxH = max(safeBottom - tableTop - Theme.Space.sm, 120)
-        // 지출이 없는 날: emptyLabel이 들어갈 최소 높이를 줘서 카드 위아래 여백을 맞춘다
         let minH: CGFloat = dayExpenses.isEmpty ? 56 : 1
         let newH = min(max(contentH, minH), maxH)
         if abs(detailTableHeight.constant - newH) > 0.5 {   // 변화 있을 때만 → 루프 방지
@@ -282,14 +199,13 @@ final class CalendarViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        updateDetailTableHeight()   // 회전·초기 레이아웃 후 높이 재보정
+        updateDetailTableHeight()
     }
 
     // MARK: Data
     @objc private func reload() {
         let cal = Calendar.current
-        monthButton.configuration?.title = "\(year)년 \(month)월"
-        todayButton.isHidden = (year == Date().year && month == Date().month)
+        monthNav.configure(year: year, month: month)
         dailyTotals = ExpenseStore.shared.dailyTotals(year: year, month: month)
         dailyTops = ExpenseStore.shared.dailyTopCategory(year: year, month: month)
 
@@ -367,10 +283,7 @@ final class CalendarViewController: UIViewController {
 
     private func updateDetail() {
         let date = dateFor(selectedDay)
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        f.dateFormat = "M월 d일 (E)"
-        detailDateLabel.text = f.string(from: date)
+        detailDateLabel.text = Fmt.monthDayWeekday.string(from: date)
 
         dayExpenses = ExpenseStore.shared.expenses(on: date)
         let total = dayExpenses.reduce(0) { $0 + $1.amount }
@@ -380,7 +293,7 @@ final class CalendarViewController: UIViewController {
         detailTable.performBatchUpdates(nil) { [weak self] _ in
             self?.updateDetailTableHeight()
         }
-        // 가벼운 페이드 + 다운-업 전환 (데이터가 툭 끊기지 않고 유기적으로 바뀌게)
+        // 가벼운 페이드 + 다운-업 전환
         for v in [detailTable, emptyLabel] as [UIView] {
             v.alpha = 0
             v.transform = CGAffineTransform(translationX: 0, y: 8)
@@ -392,9 +305,6 @@ final class CalendarViewController: UIViewController {
     }
 
     // MARK: Month nav
-    @objc private func prevMonth() { shift(-1) }
-    @objc private func nextMonth() { shift(+1) }
-
     @objc private func jumpToToday() {
         Haptic.selection()
         let t = Date()
@@ -415,14 +325,13 @@ final class CalendarViewController: UIViewController {
         }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
     private func shift(_ delta: Int) {
         Haptic.selection()
         var c = DateComponents(); c.year = year; c.month = month + delta
         guard let d = Calendar.current.date(from: c) else { return }
         year = d.year; month = d.month
-        // 이동한 달이 현재 달이면 오늘, 아니면 1일 선택
         let t = Date()
         selectedDay = (year == t.year && month == t.month) ? Calendar.current.component(.day, from: t) : 1
         reload()
@@ -439,7 +348,7 @@ final class CalendarViewController: UIViewController {
         let vc = AddViewController(editing: expense)
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
 }
 
@@ -461,14 +370,7 @@ extension CalendarViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath
     ) -> UISwipeActionsConfiguration? {
-        let expense = dayExpenses[indexPath.row]
-        let delete = UIContextualAction(style: .destructive, title: nil) { _, _, done in
-            Haptic.warning()
-            ExpenseStore.shared.delete(id: expense.id)
-            done(true)
-        }
-        delete.image = UIImage(systemName: "trash.fill")
-        delete.backgroundColor = .systemRed
-        return UISwipeActionsConfiguration(actions: [delete])
+        // 기록 탭과 동일 동작 — 자동 생성분은 오렌지 '건너뛰기'+Undo, 일반은 빨강 '삭제'+Undo (공용 헬퍼)
+        return expenseSwipeConfig(dayExpenses[indexPath.row], in: view)
     }
 }

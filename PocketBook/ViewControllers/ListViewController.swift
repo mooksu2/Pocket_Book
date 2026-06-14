@@ -10,43 +10,8 @@ final class ListViewController: UIViewController {
     private var categoryFilter: Category?
 
     // MARK: Header
-    private let monthButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.baseForegroundColor = Theme.Color.mainText
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.title(16); return a
-        }
-        // 탭 가능함을 알리는 아래 화살표 + 살짝 눌리는 피드백
-        config.image = UIImage(systemName: "chevron.down",
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold))
-        config.imagePlacement = .trailing
-        config.imagePadding = 5
-        let b = UIButton(configuration: config)
-        b.configurationUpdateHandler = { btn in
-            btn.alpha = btn.isHighlighted ? 0.5 : 1
-        }
-        return b
-    }()
-    private let prevButton = ListViewController.navButton("chevron.left")
-    private let nextButton = ListViewController.navButton("chevron.right")
-    
-    private let todayButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.title = "오늘"
-        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
-        config.baseForegroundColor = Theme.Color.point
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.caption(12); return a
-        }
-        let b = UIButton(configuration: config)
-        b.backgroundColor = Theme.Color.pointSoft   // 테두리 → 틴트 (새 칩 언어와 통일)
-        b.layer.cornerRadius = 12
-        b.layer.cornerCurve = .continuous
-        b.translatesAutoresizingMaskIntoConstraints = false
-        return b
-    }()
-    
+    private let monthNav = MonthNavigatorView()
+
     private let totalCaption: UILabel = {
         let l = UILabel()
         l.text = "이번 달 지출"
@@ -55,7 +20,7 @@ final class ListViewController: UIViewController {
         l.textAlignment = .left
         return l
     }()
-    
+
     private let totalLabel: AnimatedCountLabel = {
         let l = AnimatedCountLabel()
         l.font = Theme.Font.display(36)
@@ -109,14 +74,13 @@ final class ListViewController: UIViewController {
         tv.separatorInset = UIEdgeInsets(top: 0, left: 64, bottom: 0, right: 16)
         tv.backgroundColor = .clear
         tv.sectionHeaderTopPadding = Theme.Space.xs
-        // insetGrouped 카드 좌우 인셋을 헤더 카드(Space.lg=16)에 맞춤 (기본값은 더 넓음)
         tv.directionalLayoutMargins = NSDirectionalEdgeInsets(
             top: 0, leading: Theme.Space.lg, bottom: 0, trailing: Theme.Space.lg)
         tv.preservesSuperviewLayoutMargins = false
         tv.rowHeight = UITableView.automaticDimension
         tv.estimatedRowHeight = 64
         tv.showsVerticalScrollIndicator = false
-        tv.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 12, right: 0)   // 탭바 회피는 additionalSafeAreaInsets가 처리
+        tv.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 12, right: 0)
         return tv
     }()
     private lazy var emptyView = EmptyStateView(
@@ -129,7 +93,7 @@ final class ListViewController: UIViewController {
                            withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)), for: .normal)
         b.tintColor = .white
         b.backgroundColor = Theme.Color.point
-        b.layer.cornerRadius = 29          // 58/2 → 원형
+        b.layer.cornerRadius = 29
         b.layer.cornerCurve = .continuous
         b.translatesAutoresizingMaskIntoConstraints = false
         Theme.applyCardShadow(to: b.layer, opacity: 0.35, radius: 12, y: 6)
@@ -140,7 +104,7 @@ final class ListViewController: UIViewController {
     // MARK: 고정지출 진입 (Fixed-expense entry)
     private let fixedRow: UIControl = {
         let v = UIControl()
-        v.backgroundColor = .clear   // 헤더 카드 안에 들어가므로 투명
+        v.backgroundColor = .clear
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
@@ -172,14 +136,9 @@ final class ListViewController: UIViewController {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    /// 헤더 카드 + 인사이트/고정지출 구분선
-    private let headerCard: UIView = {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.card
-        v.layer.cornerRadius = Theme.Radius.lg
-        v.layer.cornerCurve = .continuous
-        v.translatesAutoresizingMaskIntoConstraints = false
-        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
+    /// 헤더 카드
+    private let headerCard: CardView = {
+        let v = CardView()
         return v
     }()
     private let insightDivider: UIView = {
@@ -225,21 +184,9 @@ final class ListViewController: UIViewController {
         return iv
     }()
 
-    private static func navButton(_ symbol: String) -> UIButton {
-        var config = UIButton.Configuration.plain()
-        config.image = UIImage(systemName: symbol,
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
-        config.baseForegroundColor = Theme.Color.point
-        // 터치 영역 확대 — 화살표 판정이 빡빡하지 않게
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
-        let b = UIButton(configuration: config)
-        return b
-    }
-
     // MARK: Lifecycle
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 타이틀이 없으므로 네비바를 숨겨 콘텐츠를 위로 끌어올린다
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
@@ -247,7 +194,7 @@ final class ListViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
         buildLayout()
-        title = ""   // 콘텐츠로 식별 가능 → 공간 확보
+        title = ""
         wireActions()
 
         filterBar.onSearchChanged = { [weak self] text in
@@ -270,25 +217,6 @@ final class ListViewController: UIViewController {
 
     // MARK: Layout
     private func buildLayout() {
-        // 월 내비: 대칭형 컨트롤이라 정중앙 배치 (내비 존 = 가운데 / 콘텐츠 존 = 좌측 히어로)
-        let monthGroup = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton])
-        monthGroup.alignment = .center
-        monthGroup.spacing = Theme.Space.sm
-        monthGroup.translatesAutoresizingMaskIntoConstraints = false
-
-        let navRow = UIView()
-        navRow.translatesAutoresizingMaskIntoConstraints = false
-        navRow.addSubview(monthGroup)
-        navRow.addSubview(todayButton)
-        todayButton.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            monthGroup.centerXAnchor.constraint(equalTo: navRow.centerXAnchor),
-            monthGroup.topAnchor.constraint(equalTo: navRow.topAnchor),
-            monthGroup.bottomAnchor.constraint(equalTo: navRow.bottomAnchor),
-            todayButton.trailingAnchor.constraint(equalTo: navRow.trailingAnchor),
-            todayButton.centerYAnchor.constraint(equalTo: navRow.centerYAnchor),
-        ])
-
         insightView.addSubview(insightLabel)
         fixedRow.addSubview(fixedIcon)
         fixedRow.addSubview(fixedTitleLabel)
@@ -324,25 +252,17 @@ final class ListViewController: UIViewController {
             cardStack.bottomAnchor.constraint(equalTo: headerCard.bottomAnchor),
         ])
 
-        // 전체 헤더: 월 내비(카드 밖) + 헤더 카드
-        let header = UIStackView(arrangedSubviews: [navRow, headerCard])
-        header.axis = .vertical
-        header.alignment = .fill
-        header.spacing = Theme.Space.md
-        header.translatesAutoresizingMaskIntoConstraints = false
-        header.isLayoutMarginsRelativeArrangement = true
-        header.layoutMargins = UIEdgeInsets(top: Theme.Space.lg, left: Theme.Space.lg,
-                                            bottom: Theme.Space.sm, right: Theme.Space.lg)
+        monthNav.translatesAutoresizingMaskIntoConstraints = false
 
         view.addSubview(tableView)
-        view.addSubview(header)      // 테이블보다 위 — 스크롤되는 카드를 가린다
-        view.addSubview(filterBar)   // 테이블보다 위 z-order — 스크롤되는 카드를 가린다
+        view.addSubview(monthNav)    // 월 네비게이션 (카드 밖)
+        view.addSubview(headerCard)  // 테이블보다 위 — 스크롤되는 카드를 가린다
+        view.addSubview(filterBar)
         view.addSubview(emptyView)
         view.addSubview(addButton)
 
         tableView.dataSource = self
         tableView.delegate = self
-        // 스크롤 영역 상단 모서리를 둥글게 — 카드가 직각 경계에서 각지게 잘리지 않도록
         tableView.layer.cornerRadius = Theme.Radius.lg
         tableView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         tableView.layer.cornerCurve = .continuous
@@ -352,11 +272,15 @@ final class ListViewController: UIViewController {
         filterBar.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            header.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            header.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            monthNav.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.lg),
+            monthNav.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            monthNav.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            // 구분선 (카드 안쪽 너비 가득)
+            headerCard.topAnchor.constraint(equalTo: monthNav.bottomAnchor, constant: Theme.Space.md),
+            headerCard.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
+            headerCard.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
+
+            // 구분선
             insightDivider.heightAnchor.constraint(equalToConstant: 1),
             fixedDivider.heightAnchor.constraint(equalToConstant: 1),
 
@@ -365,7 +289,7 @@ final class ListViewController: UIViewController {
             insightLabel.trailingAnchor.constraint(equalTo: insightView.trailingAnchor),
             insightLabel.centerYAnchor.constraint(equalTo: insightView.centerYAnchor),
 
-            // 고정지출 행: 아이콘 + (타이틀/부제) + 금액 + chevron
+            // 고정지출 행
             fixedRow.heightAnchor.constraint(equalToConstant: 44),
             fixedIcon.leadingAnchor.constraint(equalTo: fixedRow.leadingAnchor),
             fixedIcon.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
@@ -380,10 +304,9 @@ final class ListViewController: UIViewController {
             fixedAmountLabel.trailingAnchor.constraint(equalTo: fixedActionLabel.leadingAnchor, constant: -Theme.Space.sm),
             fixedAmountLabel.centerYAnchor.constraint(equalTo: fixedRow.centerYAnchor),
 
-            // 큰 금액이 카드를 넘지 않도록
             totalLabel.widthAnchor.constraint(lessThanOrEqualTo: headerCard.widthAnchor),
 
-            filterBar.topAnchor.constraint(equalTo: header.bottomAnchor, constant: Theme.Space.sm),
+            filterBar.topAnchor.constraint(equalTo: headerCard.bottomAnchor, constant: Theme.Space.md),
             filterBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             filterBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             filterBar.heightAnchor.constraint(equalToConstant: 40),
@@ -406,10 +329,10 @@ final class ListViewController: UIViewController {
     }
 
     private func wireActions() {
-        prevButton.addTarget(self, action: #selector(prevMonth), for: .touchUpInside)
-        nextButton.addTarget(self, action: #selector(nextMonth), for: .touchUpInside)
-        monthButton.addTarget(self, action: #selector(showMonthPicker), for: .touchUpInside)
-        todayButton.addTarget(self, action: #selector(jumpToToday), for: .touchUpInside)
+        monthNav.onPrev     = { [weak self] in self?.shiftMonth(-1) }
+        monthNav.onNext     = { [weak self] in self?.shiftMonth(+1) }
+        monthNav.onTapMonth = { [weak self] in self?.showMonthPicker() }
+        monthNav.onToday    = { [weak self] in self?.jumpToToday() }
         addButton.addTarget(self, action: #selector(addDown), for: .touchDown)
         addButton.addTarget(self, action: #selector(addUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         addButton.addTarget(self, action: #selector(openAdd), for: .touchUpInside)
@@ -421,7 +344,7 @@ final class ListViewController: UIViewController {
         let vc = RecurringListViewController()
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
 
     // MARK: Data
@@ -432,11 +355,10 @@ final class ListViewController: UIViewController {
         let total = ExpenseStore.shared.totalAmount(year: year, month: month)
         let insight = ExpenseStore.shared.insight(year: year, month: month)
 
-        monthButton.configuration?.title = "\(year)년 \(month)월"
-        updateTodayButton()
+        monthNav.configure(year: year, month: month)
         totalLabel.setValue(total, animated: animatedTotal)
 
-        // 고정지출 진입 줄 — 이번 달 고정지출 총액 + 액션
+        // 고정지출 진입 줄
         let fixedTotal = RecurringStore.shared.monthlyTotal()
         fixedAmountLabel.text = fixedTotal.won
         fixedActionLabel.text = RecurringStore.shared.items.isEmpty ? "등록하기" : "관리"
@@ -445,7 +367,6 @@ final class ListViewController: UIViewController {
         if let status = ExpenseStore.shared.budgetStatus(year: year, month: month) {
             budgetView.isHidden = false
             budgetView.configure(status, animated: animatedTotal)
-            // 현재 달일 때만 초과 알림 평가
             if year == Date().year && month == Date().month {
                 NotificationService.evaluateBudget(status)
             }
@@ -453,10 +374,8 @@ final class ListViewController: UIViewController {
             budgetView.isHidden = true
         }
 
-        // 지난달 대비 비교
         configureComparison()
 
-        // 인사이트 — 빈 달에도 문구를 넣어 구분선만 남는 것 방지
         insightView.isHidden = false
         if insight.entryCount > 0 {
             insightLabel.text = "💡 \(insight.headline) · 하루 평균 \(insight.dailyAverage.won)"
@@ -464,7 +383,6 @@ final class ListViewController: UIViewController {
             insightLabel.text = "💡 이번 달엔 아직 지출이 없어요"
         }
 
-        // 검색·필터 적용 (리스트만, 상단 요약은 월 전체 기준 유지)
         sections = filteredSections(from: allSections)
         let fullEmpty = allSections.isEmpty
         let filteredEmpty = sections.isEmpty
@@ -482,7 +400,6 @@ final class ListViewController: UIViewController {
         tableView.reloadData()
     }
 
-    /// 카테고리 필터 + 검색어를 적용해 섹션을 추린다.
     private func filteredSections(from all: [DaySection]) -> [DaySection] {
         let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         guard categoryFilter != nil || !q.isEmpty else { return all }
@@ -493,14 +410,13 @@ final class ListViewController: UIViewController {
                     || e.memo.lowercased().contains(q)
                     || e.category.rawValue.lowercased().contains(q)
                     || e.tags.contains { $0.lowercased().contains(q) }
-                    || (e.isFixed && "고정지출".contains(q))
+                    || (e.recurringID != nil && "고정지출".contains(q))
                 return catOK && textOK
             }
             return items.isEmpty ? nil : DaySection(date: sec.date, expenses: items)
         }
     }
 
-    /// 지난달 같은 기간 대비 증감을 라벨에 표시.
     private func configureComparison() {
         let cmp = ExpenseStore.shared.comparison(year: year, month: month)
         guard cmp.hasPrevious else { comparisonLabel.isHidden = true; return }
@@ -519,16 +435,12 @@ final class ListViewController: UIViewController {
     }
 
     // MARK: Actions
-    @objc private func prevMonth() { shiftMonth(-1) }
-    @objc private func nextMonth() { shiftMonth(+1) }
-
     private func shiftMonth(_ delta: Int) {
         Haptic.selection()
         var c = DateComponents(); c.year = year; c.month = month + delta
         if let d = Calendar.current.date(from: c) {
             year = d.year; month = d.month
             reload(animatedTotal: true)
-            // 헤더 방향 전환 페이드
             tableView.transform = CGAffineTransform(translationX: delta > 0 ? 20 : -20, y: 0)
             tableView.alpha = 0.4
             UIView.animate(withDuration: 0.25) {
@@ -543,7 +455,7 @@ final class ListViewController: UIViewController {
         year = Date().year; month = Date().month
         reload(animatedTotal: true)
     }
-    
+
     @objc private func showMonthPicker() {
         Haptic.selection()
         let vc = MonthPickerViewController(year: year, month: month)
@@ -554,14 +466,9 @@ final class ListViewController: UIViewController {
         }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
 
-    private func updateTodayButton() {
-        let t = Date()
-        todayButton.isHidden = (year == t.year && month == t.month)
-    }
-    
     @objc private func addDown() { addButton.pressDown() }
     @objc private func addUp()   { addButton.pressUp() }
 
@@ -578,9 +485,8 @@ final class ListViewController: UIViewController {
         }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
-
 }
 
 // MARK: - DataSource / Delegate
@@ -617,41 +523,8 @@ extension ListViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath
     ) -> UISwipeActionsConfiguration? {
+        // 자동 생성분: 오렌지 '건너뛰기' / 일반: 빨강 '삭제' — 캘린더 탭과 동일 동작 (공용 헬퍼)
         let expense = sections[indexPath.section].expenses[indexPath.row]
-
-        // 고정지출 자동 생성분: 오렌지 "이번 달 건너뛰기" — 재진입 시 재생성이 의도된 동작
-        // 일반 지출: 빨간 "삭제" — 영구 삭제
-        let isAutoGenerated = expense.recurringID != nil
-        let action = UIContextualAction(style: .destructive, title: nil) { [weak self] _, _, done in
-            self?.deleteWithUndo(expense)
-            done(true)
-        }
-        action.image = UIImage(systemName: isAutoGenerated ? "calendar.badge.minus" : "trash.fill")
-        action.backgroundColor = isAutoGenerated ? .systemOrange : .systemRed
-        return UISwipeActionsConfiguration(actions: [action])
-    }
-
-    /// 즉시 삭제 후 되돌리기 토스트.
-    /// - 고정지출 자동 생성분: skipMonth 마킹(재생성 방지) / Undo → unskip(재생성 허용)
-    /// - 일반 지출: 영구 삭제 / Undo → 동일 id 복원
-    private func deleteWithUndo(_ expense: Expense) {
-        Haptic.medium()
-        let snapshot = Expense(
-            id: expense.id,
-            category: expense.category,
-            amount: expense.amount,
-            memo: expense.memo,
-            date: expense.date,
-            tags: expense.tags,
-            isFixed: expense.isFixed,
-            recurringID: expense.recurringID)
-
-        ExpenseStore.shared.delete(id: expense.id)   // recurringID 있으면 내부에서 skipMonth 호출
-
-        let message = expense.recurringID != nil ? "이번 달 건너뛰었어요" : "지출이 삭제됐어요"
-        Toast.showWithAction(message, actionTitle: "되돌리기", in: view) {
-            Haptic.success()
-            ExpenseStore.shared.add(snapshot)   // recurringID 있으면 내부에서 unskipMonth 호출
-        }
+        return expenseSwipeConfig(expense, in: view)
     }
 }

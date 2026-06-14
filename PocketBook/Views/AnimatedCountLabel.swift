@@ -20,7 +20,9 @@ final class AnimatedCountLabel: UILabel {
         startValue = endValue
         endValue   = value
         startTime  = CACurrentMediaTime()
-        let link = CADisplayLink(target: self, selector: #selector(tick))
+        // 약한 프록시로 link → self 강한 참조 사이클 차단
+        let link = CADisplayLink(target: DisplayLinkProxy(target: self, selector: #selector(tick)),
+                                 selector: #selector(DisplayLinkProxy.tick))
         link.add(to: .main, forMode: .common)
         displayLink = link
     }

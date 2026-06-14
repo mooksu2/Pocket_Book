@@ -48,6 +48,12 @@ final class DonutChartView: UIView {
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
             stack.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.6),
         ])
+
+        // 다크/라이트 전환 시 CALayer 색상을 다시 그린다 (iOS 17 모던 API)
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (v: DonutChartView, _) in
+            v.needsRedraw = true
+            v.setNeedsLayout()
+        }
     }
     required init?(coder: NSCoder) { fatalError() }
 

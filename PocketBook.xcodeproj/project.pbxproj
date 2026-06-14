@@ -30,6 +30,11 @@
 		90B7D3A32FD67728000D359B /* RecurringListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90B7D3A22FD67728000D359B /* RecurringListViewController.swift */; };
 		90B7D3A52FD67745000D359B /* RecurringEditViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90B7D3A42FD67745000D359B /* RecurringEditViewController.swift */; };
 		90C9B1682FD6062200E0BB31 /* SplashViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C9B1672FD6062200E0BB31 /* SplashViewController.swift */; };
+		90CF1E8C2FDE8EEB00599E64 /* CardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CF1E8B2FDE8EEB00599E64 /* CardView.swift */; };
+		90CF1E8E2FDE8F0500599E64 /* DisplayLinkProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CF1E8D2FDE8F0500599E64 /* DisplayLinkProxy.swift */; };
+		90CF1E902FDE8F2000599E64 /* MonthNavigatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CF1E8F2FDE8F2000599E64 /* MonthNavigatorView.swift */; };
+		90CF1E922FDE8F3C00599E64 /* UIViewController+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CF1E912FDE8F3C00599E64 /* UIViewController+Helpers.swift */; };
+		90CF1E942FDE8F5000599E64 /* CardFormViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CF1E932FDE8F5000599E64 /* CardFormViewController.swift */; };
 		90D12C172FD8410500FEFD9E /* PocketBookContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D12C162FD8410500FEFD9E /* PocketBookContainer.swift */; };
 		90D12C192FD868DB00FEFD9E /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D12C182FD868DB00FEFD9E /* Toast.swift */; };
 		90DAE6F82FDB282700860242 /* AmountInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90DAE6F72FDB282700860242 /* AmountInputView.swift */; };
@@ -78,6 +83,11 @@
 		90B7D3A22FD67728000D359B /* RecurringListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringListViewController.swift; sourceTree = "<group>"; };
 		90B7D3A42FD67745000D359B /* RecurringEditViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecurringEditViewController.swift; sourceTree = "<group>"; };
 		90C9B1672FD6062200E0BB31 /* SplashViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashViewController.swift; sourceTree = "<group>"; };
+		90CF1E8B2FDE8EEB00599E64 /* CardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardView.swift; sourceTree = "<group>"; };
+		90CF1E8D2FDE8F0500599E64 /* DisplayLinkProxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayLinkProxy.swift; sourceTree = "<group>"; };
+		90CF1E8F2FDE8F2000599E64 /* MonthNavigatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthNavigatorView.swift; sourceTree = "<group>"; };
+		90CF1E912FDE8F3C00599E64 /* UIViewController+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIViewController+Helpers.swift"; sourceTree = "<group>"; };
+		90CF1E932FDE8F5000599E64 /* CardFormViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardFormViewController.swift; sourceTree = "<group>"; };
 		90D12C162FD8410500FEFD9E /* PocketBookContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketBookContainer.swift; sourceTree = "<group>"; };
 		90D12C182FD868DB00FEFD9E /* Toast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Toast.swift; sourceTree = "<group>"; };
 		90DAE6F72FDB282700860242 /* AmountInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmountInputView.swift; sourceTree = "<group>"; };
@@ -138,6 +148,7 @@
 				65A20FD9173C48FEBAE5486B /* UIColor+Hex.swift */,
 				CFAC58BE36BE48E9AF8241EA /* Formatters.swift */,
 				8AFEE42D9E3F40B1951CE686 /* UIView+Extensions.swift */,
+				90CF1E912FDE8F3C00599E64 /* UIViewController+Helpers.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -170,6 +181,9 @@
 				90DAE6F72FDB282700860242 /* AmountInputView.swift */,
 				90E4DF782FDBBCED0081B9A1 /* CurvedTabBar.swift */,
 				90A940862FDD8E76004775E5 /* Datepickersheet.swift */,
+				90CF1E8B2FDE8EEB00599E64 /* CardView.swift */,
+				90CF1E8D2FDE8F0500599E64 /* DisplayLinkProxy.swift */,
+				90CF1E8F2FDE8F2000599E64 /* MonthNavigatorView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -224,6 +238,7 @@
 				90C9B1672FD6062200E0BB31 /* SplashViewController.swift */,
 				90B7D3A22FD67728000D359B /* RecurringListViewController.swift */,
 				90B7D3A42FD67745000D359B /* RecurringEditViewController.swift */,
+				90CF1E932FDE8F5000599E64 /* CardFormViewController.swift */,
 			);
 			path = ViewControllers;
 			sourceTree = "<group>";
@@ -306,9 +321,11 @@
 				EF1BDC9C4A0B41168B990520 /* Storage.swift in Sources */,
 				943B00213AB746BE8C00C2D4 /* ExpenseStore.swift in Sources */,
 				C612F704B3BB462FA7339E83 /* SettingsStore.swift in Sources */,
+				90CF1E922FDE8F3C00599E64 /* UIViewController+Helpers.swift in Sources */,
 				A5667075607E4689A7711265 /* NotificationService.swift in Sources */,
 				2E33DD57CA834B0196A30154 /* UIColor+Hex.swift in Sources */,
 				0B1C71E1ABDC452FBBD9F12B /* Formatters.swift in Sources */,
+				90CF1E8E2FDE8F0500599E64 /* DisplayLinkProxy.swift in Sources */,
 				AC766E1621924CB9A4D3A69B /* UIView+Extensions.swift in Sources */,
 				90DAE6F82FDB282700860242 /* AmountInputView.swift in Sources */,
 				5C3E4369DDAC4B5BB1831D64 /* AnimatedCountLabel.swift in Sources */,
@@ -323,17 +340,20 @@
 				90B7D3A12FD67716000D359B /* RecurringStore.swift in Sources */,
 				2E11EDA48D4E47D09C07B4C3 /* CategoryBreakdownRow.swift in Sources */,
 				90B7D39F2FD67704000D359B /* RecurringExpense.swift in Sources */,
+				90CF1E8C2FDE8EEB00599E64 /* CardView.swift in Sources */,
 				3EAD5CCF76F841B9A4548F76 /* CategoryFilterBar.swift in Sources */,
 				1CF1F02873AA4DFBAC4595F9 /* CalendarDayCell.swift in Sources */,
 				7C8D75E1B46A4B5FA9A14BCB /* BudgetProgressView.swift in Sources */,
 				E838E76783D94C0791B15165 /* MainTabBarController.swift in Sources */,
 				C0488CAC26D244658DB7243D /* ListViewController.swift in Sources */,
 				40D214F508F94E79AA3EAE7A /* CalendarViewController.swift in Sources */,
+				90CF1E942FDE8F5000599E64 /* CardFormViewController.swift in Sources */,
 				40945C52F96D47AE9EBEC56C /* AddViewController.swift in Sources */,
 				907E0CF32FD55E27007D5911 /* TagLibrary.swift in Sources */,
 				90B7D3A52FD67745000D359B /* RecurringEditViewController.swift in Sources */,
 				C8D5E9A2F9D6433EAE4053A9 /* StatsViewController.swift in Sources */,
 				9F2E5ED40D524B0E9DF7D10C /* SettingsViewController.swift in Sources */,
+				90CF1E902FDE8F2000599E64 /* MonthNavigatorView.swift in Sources */,
 				907E0CF72FD5773B007D5911 /* MonthPickerViewController.swift in Sources */,
 				90A940872FDD8E76004775E5 /* Datepickersheet.swift in Sources */,
 				90B7D3A32FD67728000D359B /* RecurringListViewController.swift in Sources */,

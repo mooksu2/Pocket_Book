@@ -201,7 +201,7 @@ final class RecurringListViewController: UIViewController {
         let vc = RecurringEditViewController(editing: item)
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
 }
 
@@ -225,8 +225,19 @@ extension RecurringListViewController: UITableViewDataSource, UITableViewDelegat
     func tableView(_ tableView: UITableView,
                    trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         let item = items[indexPath.row]
-        let delete = UIContextualAction(style: .destructive, title: "삭제") { _, _, done in
+        let delete = UIContextualAction(style: .destructive, title: "삭제") { [weak self] _, _, done in
+            guard let self else { done(false); return }
+            // 복원용 스냅샷 (삭제 전에 값 보관 — skippedMonths까지 보존해 재생성 방지 유지)
+            let snap = RecurringExpense(
+                id: item.id, name: item.name, amount: item.amount,
+                category: item.category, dayOfMonth: item.dayOfMonth,
+                isActive: item.isActive, tags: item.tags)
+            snap.skippedMonths = item.skippedMonths
             RecurringStore.shared.delete(id: item.id)
+            Toast.showWithAction("고정지출이 삭제됐어요", actionTitle: "되돌리기", in: self.view) {
+                Haptic.success()
+                RecurringStore.shared.add(snap)   // 같은 id로 복원 → 기존 지출 링크도 다시 연결
+            }
             done(true)
         }
         let pauseTitle = item.isActive ? "일시정지" : "재개"

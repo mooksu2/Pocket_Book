@@ -101,7 +101,8 @@ final class ExpenseStore {
         let cal = Calendar.current
         return expenses
             .filter {
-                if excludingFixed && $0.isFixed { return false }
+                // "고정지출" = 반복 규칙이 있는 지출(recurringID != nil)로 일원화
+                if excludingFixed && $0.recurringID != nil { return false }
                 let c = cal.dateComponents([.year, .month], from: $0.date)
                 return c.year == year && c.month == month
             }

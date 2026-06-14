@@ -117,14 +117,15 @@ final class ExpenseCell: UITableViewCell {
 
         // 태그 알약 다시 그리기
         tagStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        if e.recurringID != nil || e.isFixed {
+        // "고정" 배지 = 반복 규칙이 있는 지출(recurringID != nil)만 — 일회성 isFixed는 배지 없음
+        let isRecurring = (e.recurringID != nil)
+        if isRecurring {
             tagStack.addArrangedSubview(makeFixedChip())
         }
         for tag in e.tags {
             tagStack.addArrangedSubview(makeChip(tag, color: e.category.color, filled: false))
         }
-        let isFixedRow = (e.recurringID != nil || e.isFixed)
-        tagStack.isHidden = e.tags.isEmpty && !isFixedRow
+        tagStack.isHidden = e.tags.isEmpty && !isRecurring
         if !tagStack.isHidden {
             let spacer = UIView()
             spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)

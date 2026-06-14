@@ -11,6 +11,8 @@ final class BarChartView: UIView {
     private var displayLink: CADisplayLink?
     private var startTime: CFTimeInterval = 0
     private let duration: CFTimeInterval = 0.7
+    /// 매 draw마다 생성하던 색공간을 1회만 만들어 재사용
+    private static let colorSpace = CGColorSpaceCreateDeviceRGB()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -29,7 +31,9 @@ final class BarChartView: UIView {
         displayLink?.invalidate()
         progress = 0
         startTime = CACurrentMediaTime()
-        let link = CADisplayLink(target: self, selector: #selector(step))
+        // 약한 프록시로 link → self 강한 참조 사이클 차단
+        let link = CADisplayLink(target: DisplayLinkProxy(target: self, selector: #selector(step)),
+                                 selector: #selector(DisplayLinkProxy.tick))
         link.add(to: .main, forMode: .common)
         displayLink = link
     }
@@ -81,7 +85,7 @@ final class BarChartView: UIView {
                 let clip = UIBezierPath(roundedRect: fillRect, cornerRadius: barH / 2)
                 clip.addClip()
                 let colors = cat.gradient.map { $0.cgColor } as CFArray
-                if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                if let grad = CGGradient(colorsSpace: Self.colorSpace,
                                          colors: colors, locations: [0, 1]) {
                     ctx.drawLinearGradient(grad,
                         start: CGPoint(x: labelW, y: 0),

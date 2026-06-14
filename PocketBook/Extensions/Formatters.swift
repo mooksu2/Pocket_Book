@@ -8,6 +8,20 @@ enum Fmt {
         f.locale = Locale(identifier: "ko_KR")
         return f
     }()
+
+    // 캐시된 DateFormatter — 생성 비용이 커서 재사용 (모두 main-thread 사용이라 싱글톤 안전)
+    static let time            = make("a h:mm")          // 오전 9:05
+    static let monthDay        = make("M월 d일")          // 6월 5일
+    static let monthDayWeekday = make("M월 d일 (E)")      // 6월 5일 (목)
+    static let yyyyMd          = make("yyyy. M. d.")     // 2026. 6. 5.
+    static let fullKorean      = make("yyyy년 M월 d일")   // 2026년 6월 5일
+
+    private static func make(_ format: String) -> DateFormatter {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = format
+        return f
+    }
 }
 
 extension Int {
@@ -27,33 +41,16 @@ extension Date {
     /// "오늘 · 6월 5일", "어제 · 6월 4일", "6월 3일 (화)"
     var sectionTitle: String {
         let cal = Calendar.current
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        if cal.isDateInToday(self) {
-            f.dateFormat = "M월 d일"
-            return "오늘 · " + f.string(from: self)
-        } else if cal.isDateInYesterday(self) {
-            f.dateFormat = "M월 d일"
-            return "어제 · " + f.string(from: self)
-        } else {
-            f.dateFormat = "M월 d일 (E)"
-            return f.string(from: self)
-        }
+        if cal.isDateInToday(self)     { return "오늘 · " + Fmt.monthDay.string(from: self) }
+        if cal.isDateInYesterday(self) { return "어제 · " + Fmt.monthDay.string(from: self) }
+        return Fmt.monthDayWeekday.string(from: self)
     }
 
-    var timeShort: String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        f.dateFormat = "a h:mm"
-        return f.string(from: self)
-    }
+    var timeShort: String { Fmt.time.string(from: self) }
 
     func datePickerLabel() -> String {
         let cal = Calendar.current
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        f.dateFormat = "yyyy년 M월 d일"
-        let base = f.string(from: self)
+        let base = Fmt.fullKorean.string(from: self)
         if cal.isDateInToday(self)     { return base + " (오늘)" }
         if cal.isDateInYesterday(self) { return base + " (어제)" }
         return base

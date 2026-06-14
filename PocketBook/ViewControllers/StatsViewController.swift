@@ -7,41 +7,7 @@ final class StatsViewController: UIViewController {
     private var month = Date().month
 
     // MARK: Header
-    private let monthButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.baseForegroundColor = Theme.Color.mainText
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.title(16); return a
-        }
-        // 탭 가능함을 알리는 아래 화살표 + 살짝 눌리는 피드백
-        config.image = UIImage(systemName: "chevron.down",
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold))
-        config.imagePlacement = .trailing
-        config.imagePadding = 5
-        let b = UIButton(configuration: config)
-        b.configurationUpdateHandler = { btn in
-            btn.alpha = btn.isHighlighted ? 0.5 : 1
-        }
-        return b
-    }()
-    private let prevButton = StatsViewController.navButton("chevron.left")
-    private let nextButton = StatsViewController.navButton("chevron.right")
-    private let todayButton: UIButton = {
-        var config = UIButton.Configuration.plain()
-        config.title = "오늘"
-        config.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
-        config.baseForegroundColor = Theme.Color.point
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            var a = $0; a.font = Theme.Font.caption(12); return a
-        }
-        let b = UIButton(configuration: config)
-        b.backgroundColor = Theme.Color.pointSoft
-        b.layer.cornerRadius = 12
-        b.layer.cornerCurve = .continuous
-        b.translatesAutoresizingMaskIntoConstraints = false
-        return b
-    }()
+    private let monthNav = MonthNavigatorView()
 
     private let modeControl: UISegmentedControl = {
         let sc = UISegmentedControl(items: ["도넛", "막대"])
@@ -71,7 +37,7 @@ final class StatsViewController: UIViewController {
         symbol: "chart.pie", title: "표시할 데이터가 없어요",
         subtitle: "이번 달 지출을 기록하면\n여기에서 분석을 볼 수 있어요")
 
-    /// 고정지출(매달 동일한 지출)을 빼고 변동지출만 분석
+    /// 고정지출(반복 규칙이 있는 지출)을 빼고 변동지출만 분석
     private var excludeFixed = false
     private lazy var fixedFilterButton: UIButton = {
         var config = UIButton.Configuration.plain()
@@ -117,7 +83,6 @@ final class StatsViewController: UIViewController {
                 }
             }
         }
-        // 행 추가/제거 후 스크롤뷰가 contentSize를 다시 계산하도록
         view.layoutIfNeeded()
     }
 
@@ -170,21 +135,9 @@ final class StatsViewController: UIViewController {
         return row
     }
 
-    private static func navButton(_ symbol: String) -> UIButton {
-        var config = UIButton.Configuration.plain()
-        config.image = UIImage(systemName: symbol,
-                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold))
-        config.baseForegroundColor = Theme.Color.point
-        // 터치 영역 확대 — 화살표 판정이 빡빡하지 않게
-        config.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
-        let b = UIButton(configuration: config)
-        return b
-    }
-
     // MARK: Lifecycle
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 타이틀이 없으므로 네비바를 숨겨 콘텐츠를 위로 끌어올린다
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
@@ -192,10 +145,11 @@ final class StatsViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = Theme.Color.background
         buildLayout()
-        title = ""   // 콘텐츠로 식별 가능 → 공간 확보
-        prevButton.addTarget(self, action: #selector(prevMonth), for: .touchUpInside)
-        nextButton.addTarget(self, action: #selector(nextMonth), for: .touchUpInside)
-        todayButton.addTarget(self, action: #selector(jumpToToday), for: .touchUpInside)
+        title = ""
+        monthNav.onPrev     = { [weak self] in self?.shift(-1) }
+        monthNav.onNext     = { [weak self] in self?.shift(+1) }
+        monthNav.onTapMonth = { [weak self] in self?.showMonthPicker() }
+        monthNav.onToday    = { [weak self] in self?.jumpToToday() }
         modeControl.addTarget(self, action: #selector(modeChanged), for: .valueChanged)
         NotificationCenter.default.addObserver(self, selector: #selector(reload),
                                                name: .expensesDidChange, object: nil)
@@ -209,26 +163,9 @@ final class StatsViewController: UIViewController {
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
-    private let chartCard: UIView = {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.card
-        v.layer.cornerRadius = Theme.Radius.lg
-        v.layer.cornerCurve = .continuous
-        v.translatesAutoresizingMaskIntoConstraints = false
-        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
-        return v
-    }()
-    private let breakdownCard: UIView = {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.card
-        v.layer.cornerRadius = Theme.Radius.lg
-        v.layer.cornerCurve = .continuous
-        v.translatesAutoresizingMaskIntoConstraints = false
-        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
-        return v
-    }()
+    private let chartCard = CardView()
+    private let breakdownCard = CardView()
 
-    /// 고정지출 제외 토글로 인해 표시할 게 없을 때 차트 자리에 띄우는 안내
     private let filteredEmptyLabel: UILabel = {
         let l = UILabel()
         l.text = "고정지출을 제외한 지출이 없어요"
@@ -241,7 +178,6 @@ final class StatsViewController: UIViewController {
         return l
     }()
 
-    /// 도넛 모드 색-카테고리 범례 (막대엔 자체 라벨이 있어 불필요)
     private let legendStack: UIStackView = {
         let s = UIStackView()
         s.axis = .horizontal
@@ -253,29 +189,10 @@ final class StatsViewController: UIViewController {
     }()
 
     private func buildLayout() {
+        monthNav.translatesAutoresizingMaskIntoConstraints = false
         donut.translatesAutoresizingMaskIntoConstraints = false
         bars.translatesAutoresizingMaskIntoConstraints = false
         emptyView.translatesAutoresizingMaskIntoConstraints = false
-
-        // 월 내비: 월 그룹 정중앙 + 오늘 버튼 우측 (기록 탭과 동일)
-        let monthGroup = UIStackView(arrangedSubviews: [prevButton, monthButton, nextButton])
-        monthGroup.alignment = .center
-        monthGroup.spacing = Theme.Space.sm
-        monthGroup.translatesAutoresizingMaskIntoConstraints = false
-
-        let navRow = UIView()
-        navRow.translatesAutoresizingMaskIntoConstraints = false
-        navRow.addSubview(monthGroup)
-        navRow.addSubview(todayButton)
-        NSLayoutConstraint.activate([
-            monthGroup.centerXAnchor.constraint(equalTo: navRow.centerXAnchor),
-            monthGroup.topAnchor.constraint(equalTo: navRow.topAnchor),
-            monthGroup.bottomAnchor.constraint(equalTo: navRow.bottomAnchor),
-            todayButton.trailingAnchor.constraint(equalTo: navRow.trailingAnchor, constant: -Theme.Space.lg),
-            todayButton.centerYAnchor.constraint(equalTo: navRow.centerYAnchor),
-        ])
-
-        monthButton.addTarget(self, action: #selector(showMonthPicker), for: .touchUpInside)
 
         let chartContainer = UIView()
         chartContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -290,7 +207,7 @@ final class StatsViewController: UIViewController {
         breakdownTitle.textColor = Theme.Color.subText
         breakdownTitle.translatesAutoresizingMaskIntoConstraints = false
 
-        view.addSubview(navRow)
+        view.addSubview(monthNav)
         view.addSubview(scrollView)
         view.addSubview(emptyView)
         scrollView.addSubview(chartCard)
@@ -305,11 +222,11 @@ final class StatsViewController: UIViewController {
         let fg = scrollView.frameLayoutGuide
 
         NSLayoutConstraint.activate([
-            navRow.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.lg),
-            navRow.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            navRow.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            monthNav.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Space.lg),
+            monthNav.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            monthNav.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            scrollView.topAnchor.constraint(equalTo: navRow.bottomAnchor, constant: Theme.Space.md),
+            scrollView.topAnchor.constraint(equalTo: monthNav.bottomAnchor, constant: Theme.Space.md),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
@@ -380,20 +297,16 @@ final class StatsViewController: UIViewController {
         let totals = ExpenseStore.shared.totals(year: year, month: month, excludingFixed: excludeFixed)
         let total = ExpenseStore.shared.totalAmount(year: year, month: month, excludingFixed: excludeFixed)
         let rawTotal = ExpenseStore.shared.totalAmount(year: year, month: month)
-        monthButton.configuration?.title = "\(year)년 \(month)월"
-        todayButton.isHidden = (year == Date().year && month == Date().month)
+        monthNav.configure(year: year, month: month)
 
-        // 데이터 유무는 원본(필터 무관) 기준 — 고정지출만 있는 달에서도 카드·토글 유지
         let hasData = rawTotal > 0
         let hasFilteredData = total > 0
         emptyView.isHidden = hasData
         emptyView.isUserInteractionEnabled = !hasData
-        // 데이터 없으면 카드를 통째로 숨기고 emptyView만 표시 (빈 카드 잔존·길이 유지 방지)
         chartCard.isHidden = !hasData
-        breakdownCard.isHidden = !hasData || !hasFilteredData   // 필터로 비면 내역 카드도 숨김
+        breakdownCard.isHidden = !hasData || !hasFilteredData
         donut.isHidden = !hasFilteredData || modeControl.selectedSegmentIndex != 0
         bars.isHidden  = !hasFilteredData || modeControl.selectedSegmentIndex != 1
-        // 데이터는 있으나 고정지출 제외로 표시할 게 없을 때 안내
         filteredEmptyLabel.isHidden = !(hasData && !hasFilteredData)
         modeControl.isHidden = !hasData
         breakdownStack.isHidden = !hasData
@@ -401,13 +314,11 @@ final class StatsViewController: UIViewController {
         updateFixedFilterAppearance()
 
         guard hasData else {
-            // 펼쳐둔 행이 남지 않도록 비우고 상태 초기화
             expandedCategories.removeAll()
             breakdownStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
             return
         }
 
-        // 필터 결과가 비면 차트·내역은 비우고 안내만
         guard hasFilteredData else {
             expandedCategories.removeAll()
             breakdownStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -418,7 +329,6 @@ final class StatsViewController: UIViewController {
         rebuildLegend(totals: totals)
         legendStack.isHidden = !hasFilteredData || modeControl.selectedSegmentIndex != 0
 
-        // breakdown 갱신
         lastTotals = totals
         lastTotal = total
         rebuildBreakdown()
@@ -431,7 +341,6 @@ final class StatsViewController: UIViewController {
     }
 
     private func updateFixedFilterAppearance() {
-        // 회색 필 = 꺼짐, 파란 틴트 = 켜짐 (입력 화면 칩과 동일한 언어)
         fixedFilterButton.backgroundColor = excludeFixed ? Theme.Color.pointSoft : Theme.Color.groupedBG
         fixedFilterButton.configuration?.baseForegroundColor = excludeFixed ? Theme.Color.point : Theme.Color.subText
     }
@@ -447,7 +356,6 @@ final class StatsViewController: UIViewController {
         reload()
     }
 
-    /// 도넛 범례 갱신 — 금액 있는 카테고리만 색점+이름
     private func rebuildLegend(totals: [Category: Int]) {
         legendStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for cat in Category.allCases where (totals[cat] ?? 0) > 0 {
@@ -471,9 +379,6 @@ final class StatsViewController: UIViewController {
         }
     }
 
-    @objc private func prevMonth() { shift(-1) }
-    @objc private func nextMonth() { shift(+1) }
-
     @objc private func jumpToToday() {
         Haptic.selection()
         let t = Date()
@@ -491,7 +396,7 @@ final class StatsViewController: UIViewController {
         }
         let nav = UINavigationController(rootViewController: vc)
         nav.modalPresentationStyle = .pageSheet
-        present(nav, animated: true)
+        presentOnce(nav)
     }
     private func shift(_ d: Int) {
         Haptic.selection()

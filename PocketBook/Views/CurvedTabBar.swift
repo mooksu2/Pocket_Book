@@ -55,6 +55,12 @@ final class CurvedTabBar: UIView {
             buttons.append(b)
             stack.addArrangedSubview(b)
         }
+
+        // 다크/라이트 전환 시 CALayer cgColor를 다시 칠한다 (iOS 17 모던 API)
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (v: CurvedTabBar, _) in
+            v.shapeLayer.fillColor = Theme.Color.card.cgColor
+            v.setNeedsLayout()
+        }
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -75,6 +81,7 @@ final class CurvedTabBar: UIView {
         shapeLayer.frame = bounds
         shapeLayer.path = curvedPath(in: bounds).cgPath
         shapeLayer.fillColor = Theme.Color.card.cgColor   // 다크모드 전환 대응
+        shapeLayer.shadowColor = UIColor.black.cgColor
     }
 
     /// 양 끝 모서리만 둥근 평평한 상단 (B안)

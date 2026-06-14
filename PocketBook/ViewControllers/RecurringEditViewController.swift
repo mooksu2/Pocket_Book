@@ -1,7 +1,7 @@
 import UIKit
 
 /// 고정지출 등록·수정 폼. 메모 / 금액 / 카테고리 / 매월 며칠.
-final class RecurringEditViewController: UIViewController {
+final class RecurringEditViewController: CardFormViewController {
 
     var onSaved: (() -> Void)?
 
@@ -11,6 +11,8 @@ final class RecurringEditViewController: UIViewController {
     private var dayOfMonth = 1
     private var isSaving = false
     private let tagPicker = TagPickerView()
+    /// 카테고리 전환 시 태그 선택을 보관했다가 돌아오면 복원
+    private var tagCache: [Category: [String]] = [:]
 
     // MARK: UI
     private let nameField: UITextField = {
@@ -53,25 +55,6 @@ final class RecurringEditViewController: UIViewController {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private lazy var saveButton: UIButton = {
-        let b = UIButton(type: .system)
-        b.setTitle("저장하기", for: .normal)
-        b.titleLabel?.font = Theme.Font.title(17)
-        b.setTitleColor(.white, for: .normal)
-        b.backgroundColor = Theme.Color.point
-        b.layer.cornerRadius = 14
-        b.layer.cornerCurve = .continuous
-        b.translatesAutoresizingMaskIntoConstraints = false
-        return b
-    }()
-    /// 키보드·저장 버튼에 폼이 가려지지 않도록 전체를 스크롤 가능하게 감싼다
-    private let scrollView: UIScrollView = {
-        let sv = UIScrollView()
-        sv.keyboardDismissMode = .interactive
-        sv.showsVerticalScrollIndicator = false
-        sv.translatesAutoresizingMaskIntoConstraints = false
-        return sv
-    }()
 
     // MARK: Init
     init(editing item: RecurringExpense?) {
@@ -82,28 +65,18 @@ final class RecurringEditViewController: UIViewController {
 
     // MARK: Lifecycle
     override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = Theme.Color.background
+        super.viewDidLoad()   // 스캐폴드 구성
         title = editingItem == nil ? "고정지출 등록" : "고정지출 수정"
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .close, target: self, action: #selector(close))
 
-        buildLayout()
+        protectedTapView = amountInput
+
         amountInput.onChanged = { [weak self] amount in
-            // 버튼은 항상 누를 수 있게 두고, 빈 금액이면 alpha로만 비활성 느낌
             self?.saveButton.alpha = amount > 0 ? 1 : 0.45
         }
         nameField.delegate = self
 
-        tagPicker.setFixedToggleHidden(true)   // 고정지출 화면이라 토글 불필요, 태그만 사용
-
-        // 빈 곳 탭 → 키패드 내리기 (금액 라벨·컨트롤 위 탭은 제외)
-        let tapToDismiss = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tapToDismiss.cancelsTouchesInView = false
-        tapToDismiss.delegate = self
-        view.addGestureRecognizer(tapToDismiss)
-
-        // 수정 모드면 안내 힌트 노출
         editHintLabel.isHidden = (editingItem == nil)
 
         if let it = editingItem { prefill(it) } else {
@@ -112,9 +85,13 @@ final class RecurringEditViewController: UIViewController {
         }
     }
 
-    // MARK: Layout
-    private func buildLayout() {
-        // 카테고리 타일 4개
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if editingItem == nil { amountInput.focus() }   // 신규 등록 즉시 키패드
+    }
+
+    // MARK: Form body
+    override func makeFormStack() -> UIStackView {
         let chipRow = UIStackView()
         chipRow.axis = .horizontal
         chipRow.distribution = .fillEqually
@@ -128,23 +105,19 @@ final class RecurringEditViewController: UIViewController {
             chipRow.addArrangedSubview(chip)
         }
 
-        // 1) 금액 히어로 — 카드 없이 회색 배경에 직접
         amountInput.caption = "매달 얼마가 나가나요?"
 
-        // 2) 카테고리 카드
         let catCard = card()
         let catStack = UIStackView(arrangedSubviews: [makeFieldLabel("카테고리"), chipRow])
         catStack.axis = .vertical; catStack.spacing = Theme.Space.sm
         embed(catStack, in: catCard)
 
-        // 3) 태그 카드 (고정지출 화면이라 토글 없음)
-        tagPicker.setFixedToggleHidden(true)
         let tagCard = card()
         let tagStack = UIStackView(arrangedSubviews: [makeFieldLabel("태그"), tagPicker])
         tagStack.axis = .vertical; tagStack.spacing = Theme.Space.sm
         embed(tagStack, in: tagCard)
 
-        // 4) 옵션 카드 — 메모 / 결제일 (행 형태)
+        // 옵션 카드 — 메모 / 결제일
         nameField.textAlignment = .right
         let memoRow = optionRow("메모", nameField)
         dayButton.addTarget(self, action: #selector(openDayPicker), for: .touchUpInside)
@@ -161,87 +134,11 @@ final class RecurringEditViewController: UIViewController {
         stack.axis = .vertical
         stack.spacing = Theme.Space.md
         stack.setCustomSpacing(Theme.Space.xl, after: amountInput)
-        stack.translatesAutoresizingMaskIntoConstraints = false
         stack.isLayoutMarginsRelativeArrangement = true
         stack.layoutMargins = UIEdgeInsets(top: Theme.Space.xl, left: 0, bottom: 0, right: 0)
-
-        view.addSubview(scrollView)
-        scrollView.addSubview(stack)
-        view.addSubview(saveButton)
-        saveButton.addTarget(self, action: #selector(save), for: .touchUpInside)
-
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -Theme.Space.sm),
-
-            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Space.md),
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Theme.Space.lg),
-            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Theme.Space.lg),
-            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Space.md),
-            stack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Space.lg),
-
-            saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Space.lg),
-            saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Theme.Space.lg),
-            saveButton.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor, constant: -Theme.Space.md),
-            saveButton.heightAnchor.constraint(equalToConstant: 54),
-        ])
+        return stack
     }
 
-    // MARK: Builders
-    private func makeFieldLabel(_ t: String) -> UILabel {
-        let l = UILabel(); l.text = t
-        l.font = Theme.Font.title(15); l.textColor = Theme.Color.mainText
-        return l
-    }
-    private func card(padding: UIEdgeInsets = UIEdgeInsets(top: Theme.Space.lg, left: Theme.Space.lg,
-                                                          bottom: Theme.Space.lg, right: Theme.Space.lg)) -> UIView {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.card
-        v.layer.cornerRadius = Theme.Radius.lg
-        v.layer.cornerCurve = .continuous
-        v.translatesAutoresizingMaskIntoConstraints = false
-        Theme.applyCardShadow(to: v.layer, opacity: 0.05, radius: 16, y: 4)
-        v.layoutMargins = padding
-        return v
-    }
-    private func embed(_ content: UIView, in card: UIView) {
-        content.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(content)
-        let m = card.layoutMarginsGuide
-        NSLayoutConstraint.activate([
-            content.topAnchor.constraint(equalTo: m.topAnchor),
-            content.leadingAnchor.constraint(equalTo: m.leadingAnchor),
-            content.trailingAnchor.constraint(equalTo: m.trailingAnchor),
-            content.bottomAnchor.constraint(equalTo: m.bottomAnchor),
-        ])
-    }
-    private func optionRow(_ title: String, _ control: UIView) -> UIView {
-        let label = UILabel()
-        label.text = title
-        label.font = Theme.Font.title(15)
-        label.textColor = Theme.Color.mainText
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.setContentHuggingPriority(.required, for: .horizontal)
-        label.setContentCompressionResistancePriority(.required, for: .horizontal)
-        control.translatesAutoresizingMaskIntoConstraints = false
-        control.setContentHuggingPriority(.required, for: .horizontal)
-        let spacer = UIView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let row = UIStackView(arrangedSubviews: [label, spacer, control])
-        row.axis = .horizontal
-        row.alignment = .center
-        row.spacing = Theme.Space.md
-        return row
-    }
-    private func hairline() -> UIView {
-        let v = UIView()
-        v.backgroundColor = Theme.Color.hairline
-        v.heightAnchor.constraint(equalToConstant: 1).isActive = true
-        return v
-    }
     private func updateDayButton() {
         dayButton.configuration?.title = "매월 \(dayOfMonth)일"
     }
@@ -263,9 +160,6 @@ final class RecurringEditViewController: UIViewController {
         tagPicker.configure(for: it.category, preselected: it.tags)
     }
 
-    /// 카테고리 전환 시 태그 선택을 보관했다가 돌아오면 복원 (지출 입력 화면과 동일 UX)
-    private var tagCache: [Category: [String]] = [:]
-
     @objc private func chipTapped(_ chip: CategoryChip) {
         Haptic.selection()
         tagCache[selectedCategory] = Array(tagPicker.selectedTags)   // 떠나는 카테고리의 선택 보관
@@ -275,11 +169,6 @@ final class RecurringEditViewController: UIViewController {
         UIView.animate(withDuration: 0.2) {
             self.chips.forEach { $0.isSelected = ($0 === chip) }
         }
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        if editingItem == nil { amountInput.focus() }   // 신규 등록 즉시 키패드
     }
 
     /// 결제일 휠 피커 시트 — 1~31일을 한 번에 스크롤 선택
@@ -297,15 +186,15 @@ final class RecurringEditViewController: UIViewController {
             sheet.detents = [.medium()]
             sheet.prefersGrabberVisible = true
         }
-        present(picker, animated: true)
+        presentOnce(picker)
     }
 
-    @objc private func save() {
+    override func didTapSave() {
         guard !isSaving else { return }
         guard amountInput.amount > 0 else {
             Haptic.warning()
             amountInput.shake()
-            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)   // in: view → keyboardLayoutGuide로 키패드 위에 표시
+            Toast.show("금액을 입력해주세요", style: Toast.Style.info, in: view, duration: 1.4)
             amountInput.focus()
             return
         }
@@ -317,7 +206,6 @@ final class RecurringEditViewController: UIViewController {
 
         if let target = editingItem {
             // 편집 도중 다른 경로로 삭제된 규칙이면 조용히 부활시키지 않는다
-            // (modelContext nil 체크는 iOS 17에서 정상 객체에도 nil을 반환할 수 있어 스토어 캐시로 판별)
             guard RecurringStore.shared.item(id: target.id) != nil else {
                 RecurringStore.shared.load()
                 dismiss(animated: true) { Toast.show("이미 삭제된 고정지출이에요", style: .info) }
@@ -342,30 +230,6 @@ final class RecurringEditViewController: UIViewController {
     }
 
     @objc private func close() { dismiss(animated: true) }
-
-    @objc private func dismissKeyboard() { view.endEditing(true) }
-}
-
-extension RecurringEditViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        guard let v = touch.view else { return true }
-        // 금액 라벨·버튼·스위치·텍스트필드 위 탭은 무시 (키패드 토글 충돌 방지)
-        if v.isDescendant(of: amountInput) || v is UIControl || v is UITextField { return false }
-        return true
-    }
-}
-
-extension RecurringEditViewController: UITextFieldDelegate {
-    func textFieldShouldReturn(_ tf: UITextField) -> Bool { tf.resignFirstResponder(); return true }
-    /// 키보드가 올라온 뒤 포커스 필드를 스크롤로 끌어올린다 (저장 버튼에 가려짐 방지)
-    func textFieldDidBeginEditing(_ tf: UITextField) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.view.layoutIfNeeded()
-            let rect = tf.convert(tf.bounds, to: self.scrollView).insetBy(dx: 0, dy: -Theme.Space.lg)
-            self.scrollView.scrollRectToVisible(rect, animated: true)
-        }
-    }
 }
 
 // MARK: - DayPickerSheet (1~31일 휠 선택 시트)

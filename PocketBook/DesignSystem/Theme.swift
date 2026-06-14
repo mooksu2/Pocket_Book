@@ -74,10 +74,16 @@ enum Theme {
 }
 
 // MARK: - Haptics
+/// 제너레이터를 재사용 + prepare()로 첫 탭 지연을 줄인다 (매번 생성하던 것 개선).
 enum Haptic {
-    static func selection() { UISelectionFeedbackGenerator().selectionChanged() }
-    static func light()     { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    static func medium()    { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-    static func success()   { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-    static func warning()   { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+    private static let selectionGen = UISelectionFeedbackGenerator()
+    private static let lightGen     = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGen    = UIImpactFeedbackGenerator(style: .medium)
+    private static let notifyGen    = UINotificationFeedbackGenerator()
+
+    static func selection() { selectionGen.selectionChanged(); selectionGen.prepare() }
+    static func light()     { lightGen.impactOccurred();       lightGen.prepare() }
+    static func medium()    { mediumGen.impactOccurred();      mediumGen.prepare() }
+    static func success()   { notifyGen.notificationOccurred(.success); notifyGen.prepare() }
+    static func warning()   { notifyGen.notificationOccurred(.warning); notifyGen.prepare() }
 }

@@ -1,18 +1,15 @@
 import UIKit
 
-/// 카테고리별 태그 선택 뷰 (가로 스크롤 알약 + 고정지출 토글)
+/// 카테고리별 태그 선택 뷰 (가로 스크롤 알약).
+/// 고정지출 토글은 옵션 카드로 분리되어 여기선 태그만 다룬다.
 final class TagPickerView: UIView {
 
-    var onChanged: (([String], Bool) -> Void)?
+    var onChanged: (([String]) -> Void)?
     private(set) var selectedTags: Set<String> = []
-    private(set) var isFixed: Bool = false
 
-    private let scroll      = UIScrollView()
-    private let pillStack   = UIStackView()
-    private let fixedSwitch = UISwitch()
+    private let scroll    = UIScrollView()
+    private let pillStack = UIStackView()
     private var category: Category = .food
-    private var fixedRow: UIStackView?
-    private var sepLine: UIView?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -24,36 +21,13 @@ final class TagPickerView: UIView {
         pillStack.alignment = .center
         pillStack.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(pillStack)
-
-        let fixedLabel = UILabel()
-        fixedLabel.text      = "고정지출"
-        fixedLabel.font      = Theme.Font.body(14)
-        fixedLabel.textColor = Theme.Color.mainText
-        fixedSwitch.onTintColor = Theme.Color.point
-        fixedSwitch.addTarget(self, action: #selector(fixedToggled), for: .valueChanged)
-
-        let row = UIStackView(arrangedSubviews: [fixedLabel, UIView(), fixedSwitch])
-        row.axis = .horizontal
-        row.translatesAutoresizingMaskIntoConstraints = false
-        fixedRow = row
-
-        let separator = UIView()
-        separator.backgroundColor = Theme.Color.hairline
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        sepLine = separator
-
-        let outer = UIStackView(arrangedSubviews: [scroll, separator, row])
-        outer.axis    = .vertical
-        outer.spacing = 10
-        outer.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(outer)
+        addSubview(scroll)
 
         NSLayoutConstraint.activate([
-            outer.topAnchor.constraint(equalTo: topAnchor),
-            outer.bottomAnchor.constraint(equalTo: bottomAnchor),
-            outer.leadingAnchor.constraint(equalTo: leadingAnchor),
-            outer.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1),
+            scroll.topAnchor.constraint(equalTo: topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             scroll.heightAnchor.constraint(equalToConstant: 34),
             pillStack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
             pillStack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
@@ -64,17 +38,9 @@ final class TagPickerView: UIView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    /// 고정지출 토글(+구분선) 숨기기 — 고정지출 등록 화면처럼 토글이 불필요할 때 사용.
-    func setFixedToggleHidden(_ hidden: Bool) {
-        fixedRow?.isHidden = hidden
-        sepLine?.isHidden = hidden
-    }
-
-    func configure(for category: Category, preselected: [String] = [], isFixed: Bool = false) {
+    func configure(for category: Category, preselected: [String] = []) {
         self.category     = category
         self.selectedTags = Set(preselected)
-        self.isFixed      = isFixed
-        fixedSwitch.isOn  = isFixed
         rebuild()
     }
 
@@ -108,7 +74,7 @@ final class TagPickerView: UIView {
         Haptic.selection()
         if selectedTags.contains(tag) { selectedTags.remove(tag) } else { selectedTags.insert(tag) }
         style(button, selected: selectedTags.contains(tag))
-        onChanged?(Array(selectedTags), isFixed)
+        onChanged?(Array(selectedTags))
     }
 
     private func style(_ b: UIButton, selected: Bool) {
@@ -116,10 +82,5 @@ final class TagPickerView: UIView {
         b.backgroundColor = selected ? category.color : Theme.Color.groupedBG
         b.configuration?.baseForegroundColor = selected ? .white : Theme.Color.subText
         b.layer.borderWidth = 0
-    }
-
-    @objc private func fixedToggled(_ sw: UISwitch) {
-        isFixed = sw.isOn
-        onChanged?(Array(selectedTags), isFixed)
     }
 }
