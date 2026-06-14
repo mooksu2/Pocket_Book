@@ -282,23 +282,14 @@ open PocketBook.xcodeproj
 
 ## 🎬 시연 영상
 
-<!-- =========================================================
-     ▶️ 아래 VIDEO_ID 를 본인 유튜브 영상 ID로 교체하세요.
-        예) https://youtu.be/AbCdEfGh123  →  VIDEO_ID = AbCdEfGh123
-     GitHub README는 동영상 직접 임베드(iframe)가 막혀 있어,
-     '썸네일 클릭 → 유튜브로 이동' 방식이 표준입니다.
-========================================================= -->
+
 <div align="center">
 
-[![PocketBook 시연 영상](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://youtu.be/VIDEO_ID)
+[![PocketBook 시연 영상](docs/screenshots/video_thumbnail.png)](https://youtu.be/VIDEO_ID)
 
 ▶️ **이미지를 클릭하면 유튜브 시연 영상으로 이동합니다**
 
 </div>
-
-<!-- (선택) 직접 만든 썸네일을 쓰고 싶다면 위 대신 아래 형식 사용:
-[![PocketBook 시연 영상](docs/screenshots/video_thumbnail.png)](https://youtu.be/VIDEO_ID)
--->
 
 ---
 
