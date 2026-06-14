@@ -285,7 +285,7 @@ open PocketBook.xcodeproj
 
 <div align="center">
 
-[![PocketBook 시연 영상](docs/screenshots/video_thumbnail.png)](https://youtu.be/VIDEO_ID)
+[![PocketBook 시연 영상](docs/screenshots/video_thumbnail.png)](https://youtu.be/MyEMXMI3kG8)
 
 ▶️ **이미지를 클릭하면 유튜브 시연 영상으로 이동합니다**
 
