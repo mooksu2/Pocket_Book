@@ -157,14 +157,10 @@ PocketBook은 **기록의 마찰을 줄이는 것** 하나에 집중한 개인 �
 ## 🏗 아키텍처
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Presentation   ViewControllers · Views · DesignSystem │
-│        │  NotificationCenter (변경 통보)                 │
-│  Domain/State   ExpenseStore · RecurringStore ·         │
-│        │        SettingsStore   (@MainActor 싱글톤)       │
-│        │  ModelContext                                   │
-│  Persistence    SwiftData (@Model)  ·  UserDefaults      │
-└──────────────────────────────────────────────────────┘
+<div align="center">
+  <img src="docs/screenshots/architecture.png" width="760" alt="PocketBook 아키텍처 다이어그램">
+</div>
+
 ```
 
 **데이터 모델 (SwiftData)**
