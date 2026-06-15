@@ -161,8 +161,6 @@ PocketBook은 **기록의 마찰을 줄이는 것** 하나에 집중한 개인 �
   <img src="docs/screenshots/architecture.png" width="760" alt="PocketBook 아키텍처 다이어그램">
 </div>
 
----
-
 **데이터 모델 (SwiftData)**
 - `Expense` — 개별 지출. `@Attribute(.unique) id`, `@Transient category`(enum ↔ rawValue 변환), 고정지출 연결용 `recurringID`.
 - `RecurringExpense` — 매월 반복 '규칙'. 결제일(`dayOfMonth`), 건너뛴 달 원장(`skippedMonths`), 말일 보정 로직 내장.
